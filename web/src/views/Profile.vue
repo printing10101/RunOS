@@ -255,24 +255,24 @@ async function delGoal(id) {
 .auto-note { font-size: 11px; color: var(--text-3); }
 .src-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px;
              border-radius: 7px; margin-right: 5px; white-space: nowrap; }
-.src-measured { color: #4ade80; background: rgba(74,222,128,.14); }
+.src-measured { color: #5fc987; background: rgba(95, 201, 135,.14); }
 .src-derived { color: var(--blue); background: rgba(96,165,250,.14); }
-.src-estimated { color: #ffa24d; background: rgba(255,162,77,.14); }
-.src-user { color: var(--text-2); background: rgba(148,163,184,.16); }
-.src-unknown { color: #ff6b6b; background: rgba(255,107,107,.14); }
+.src-estimated { color: #d9a24e; background: rgba(217,162,78,.14); }
+.src-user { color: var(--text-2); background: rgba(157,184,173,.16); }
+.src-unknown { color: #e05f5f; background: rgba(224,95,95,.14); }
 .legend { font-size: 12px; color: var(--text-2); line-height: 1.9; }
 .lg-row { display: flex; align-items: baseline; gap: 2px; }
-.goal-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px dashed rgba(148,163,184,.12); }
+.goal-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px dashed rgba(157,184,173,.12); }
 .goal-main { flex: 1; min-width: 0; padding-right: 10px; }
 .goal-title-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.goal-badge { font-size: 11px; font-weight: 700; color: var(--lime); padding: 1px 7px; border-radius: 8px; background: rgba(200,241,105,.12); }
-.goal-badge.done { color: #facc15; background: rgba(250,204,21,.16); }
-.goal-badge.paused { color: var(--text-3); background: rgba(148,163,184,.14); }
+.goal-badge { font-size: 11px; font-weight: 700; color: var(--jade); padding: 1px 7px; border-radius: 8px; background: rgba(63,208,164,.12); }
+.goal-badge.done { color: #d4b06a; background: rgba(250,204,21,.16); }
+.goal-badge.paused { color: var(--text-3); background: rgba(157,184,173,.14); }
 .goal-meta { font-size: 12px; color: var(--text-3); margin-top: 3px; }
 .goal-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 .goal-ring { width: 34px; height: 34px; transform: rotate(-90deg); }
-.ring-track { stroke: rgba(148,163,184,.2); stroke-width: 3.2; }
+.ring-track { stroke: rgba(157,184,173,.2); stroke-width: 3.2; }
 .ring-fill { stroke: var(--blue); stroke-width: 3.2; stroke-linecap: round; transition: stroke-dasharray .6s ease; }
-.goal-ring.done .ring-fill { stroke: #facc15; }
+.goal-ring.done .ring-fill { stroke: #d4b06a; }
 .next-steps { font-size: 13px; color: var(--text-2); line-height: 2; padding-left: 18px; margin: 10px 0 0; }
 </style>

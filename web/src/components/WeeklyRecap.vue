@@ -75,9 +75,9 @@ defineExpose({ loadRecap })
 .rs-unit { font-size: 11px; color: var(--text-3); margin-left: 2px; }
 .rs-label { font-size: 11px; color: var(--text-3); margin-top: 2px; letter-spacing: .04em; }
 .recap-status { font-size: 12px; color: var(--text-3); margin-top: 14px; line-height: 1.6; }
-.recap-next { margin-top: 8px; border-top: 1px dashed rgba(148,163,184,.14); padding-top: 12px; }
+.recap-next { margin-top: 8px; border-top: 1px dashed rgba(157,184,173,.14); padding-top: 12px; }
 .recap-next-title { font-size: 13.5px; }
 .recap-target { font-weight: 400; color: var(--text-3); margin-left: 6px; }
 .recap-wos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.rc-woc { font-size: 12px; color: var(--text-2); background: rgba(148,163,184,.1); padding: 4px 10px; border-radius: 8px; }
+.rc-woc { font-size: 12px; color: var(--text-2); background: rgba(157,184,173,.1); padding: 4px 10px; border-radius: 8px; }
 </style>

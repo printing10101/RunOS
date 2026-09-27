@@ -137,10 +137,10 @@
           <template #header><div class="card-head">身体与负荷</div></template>
           <div class="rings">
             <RingGauge :value="weekPct" :label="d.this_week?.km ?? '-'" :digits="1" unit="km"
-                  sub="本周跑量" color="#c8f169" />
-            <RingGauge :value="vdotPct" :label="d.current_vdot ?? '-'" sub="VDOT" color="#5b9dff" />
+                  sub="本周跑量" color="#3fd0a4" />
+            <RingGauge :value="vdotPct" :label="d.current_vdot ?? '-'" sub="VDOT" color="#5f9fc9" />
             <RingGauge :value="d.assessment?.total_score || 0" :label="d.assessment?.total_score || '-'" sub="综合分"
-                  :sub2="d.assessment?.grade ? d.assessment.grade + ' 级' : ''" color="#ffa24d" />
+                  :sub2="d.assessment?.grade ? d.assessment.grade + ' 级' : ''" color="#d9a24e" />
           </div>
           <div class="ring-foot" v-if="d.this_week">
             本周已练 {{ d.this_week.sessions }} 次 · {{ d.this_week.hours }}h<span
@@ -248,7 +248,7 @@ const raceCountdown = computed(() => {
 // 课型样式统一引用 SESSION_STYLE（含知识库二代课型 interval/tempo/fartlek/hill/race），
 // 此前的四键内联映射会让二代计划的「下一课」卡片退化为通用「训练」标签
 const typeStyle = computed(() =>
-  SESSION_STYLE[d.value.next_workout?.session_type] || { label: '训练', color: '#5b9dff' })
+  SESSION_STYLE[d.value.next_workout?.session_type] || { label: '训练', color: '#5f9fc9' })
 
 const stepsTotal = computed(() => d.value.next_workout?.structured?.length || 0)
 // 心率提示按课型分组：质量课全家族（含二代词汇）都是 Z4-Z5
@@ -267,13 +267,13 @@ const rtIcon = computed(() => ({ speed: '⚡', endurance: '🏔️', balanced: '
 
 const statusColor = computed(() => {
   const s = d.value.status_summary?.status || ''
-  return { '效率良好': '#c8f169', '巅峰期': '#c8f169', '维持状态': '#5b9dff', '恢复中': '#56d4e0',
-           '效率不佳': '#ff6b6b', '负荷过高': '#ff6b6b', '训练中断': '#ffa24d' }[s] || '#5b9dff'
+  return { '效率良好': '#3fd0a4', '巅峰期': '#3fd0a4', '维持状态': '#5f9fc9', '恢复中': '#4fc3c7',
+           '效率不佳': '#e05f5f', '负荷过高': '#e05f5f', '训练中断': '#d9a24e' }[s] || '#5f9fc9'
 })
 const readinessColor = computed(() => {
   const s = d.value.status_summary?.readiness
-  if (s == null) return '#e8eef6'
-  return s >= 80 ? '#4ade80' : s >= 60 ? '#ffa24d' : '#ff6b6b'
+  if (s == null) return '#dce8e2'
+  return s >= 80 ? '#5fc987' : s >= 60 ? '#d9a24e' : '#e05f5f'
 })
 
 async function pushWo(wo) {
@@ -313,7 +313,7 @@ function renderKmChart() {
       itemStyle: {
         borderRadius: [5, 5, 2, 2],
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: '#c8f169' }, { offset: 1, color: 'rgba(200,241,105,0.25)' },
+          { offset: 0, color: '#3fd0a4' }, { offset: 1, color: 'rgba(63,208,164,0.25)' },
         ]),
       },
     }],
@@ -376,8 +376,8 @@ onUnmounted(() => {
 .today-head { display: flex; align-items: flex-end; justify-content: space-between; }
 .head-chips .el-tag { margin-left: 8px; }
 .sync-stale { cursor: pointer; }
-.sync-stale:hover { border-color: rgba(255, 162, 77, 0.6); }
-.phase-chip { background: rgba(200, 241, 105, 0.14); color: var(--lime); border: 1px solid rgba(200, 241, 105, 0.3); font-weight: 700; }
+.sync-stale:hover { border-color: rgba(217, 162, 78, 0.6); }
+.phase-chip { background: rgba(63, 208, 164, 0.14); color: var(--jade); border: 1px solid rgba(63, 208, 164, 0.3); font-weight: 700; }
 
 .status-strip {
   display: flex; align-items: center; gap: 16px; margin-top: 12px; padding: 10px 16px;
@@ -389,7 +389,7 @@ onUnmounted(() => {
 .ss-u { font-size: 11px; color: var(--text-3); }
 .ss-div { width: 1px; height: 20px; background: var(--border); }
 .ss-more { margin-left: auto; color: var(--text-3); }
-.ss-more:hover { color: var(--lime); }
+.ss-more:hover { color: var(--jade); }
 .recent-row { cursor: pointer; }
 
 .hero :deep(.el-card__header) { padding: 14px 20px 10px; }
@@ -407,7 +407,7 @@ onUnmounted(() => {
 .hstep-name { color: var(--text-2); }
 .hstep-target { color: var(--text-3); margin-left: auto; font-family: var(--font-display); letter-spacing: .03em; }
 .hstep-more { color: var(--text-3); font-size: 12px; padding-top: 4px; }
-.hero-tip { font-size: 12.5px; color: var(--orange); background: rgba(255, 162, 77, 0.08); border-radius: 8px; padding: 7px 10px; margin-top: 8px; }
+.hero-tip { font-size: 12.5px; color: var(--orange); background: rgba(217, 162, 78, 0.08); border-radius: 8px; padding: 7px 10px; margin-top: 8px; }
 .hero-actions { margin-top: 14px; display: flex; align-items: center; }
 
 
@@ -426,9 +426,9 @@ onUnmounted(() => {
 .rings { display: flex; justify-content: space-around; padding: 6px 0 2px; }
 .ring-foot { text-align: center; color: var(--text-3); font-size: 12px; margin-top: 10px; }
 .rt-row { display: flex; gap: 12px; align-items: flex-start; }
-.rt-icon { font-size: 24px; width: 44px; height: 44px; border-radius: 12px; background: rgba(200, 241, 105, 0.1);
+.rt-icon { font-size: 24px; width: 44px; height: 44px; border-radius: 12px; background: rgba(63, 208, 164, 0.1);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
-.recent-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px dashed rgba(148,163,184,.12); font-size: 13px; }
+.recent-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px dashed rgba(157,184,173,.12); font-size: 13px; }
 .recent-meta { color: var(--text-3); font-size: 12px; margin-left: 8px; }
 </style>

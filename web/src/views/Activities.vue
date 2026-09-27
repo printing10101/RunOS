@@ -254,7 +254,7 @@ onMounted(load)
 .rc-inner {
   text-align: center; padding: 8px 4px 2px;
   border: 1px solid var(--border); border-radius: 16px;
-  background: linear-gradient(180deg, rgba(200, 241, 105, 0.08), transparent);
+  background: linear-gradient(180deg, rgba(63, 208, 164, 0.08), transparent);
 }
 .rc-inner.pb { border-color: rgba(250, 204, 21, 0.4); background: linear-gradient(180deg, rgba(250, 204, 21, 0.12), transparent); }
 .rc-emojis { position: relative; font-size: 34px; line-height: 1.1; }
@@ -264,8 +264,8 @@ onMounted(load)
 .rc-headline { font-size: 17px; font-weight: 800; margin: 6px 0 12px; color: var(--text-1); }
 .rc-highlight { margin-bottom: 12px; }
 .rc-hl-label { display: block; color: var(--text-3); font-size: 11px; margin-bottom: 2px; }
-.rc-hl-value { font-family: var(--font-display); font-size: 30px; font-weight: 800; color: var(--lime); }
-.pb .rc-hl-value { color: #facc15; }
+.rc-hl-value { font-family: var(--font-display); font-size: 30px; font-weight: 800; color: var(--jade); }
+.pb .rc-hl-value { color: #d4b06a; }
 .rc-metrics { display: flex; gap: 8px; }
 .rc-metric { flex: 1; border-radius: 10px; background: var(--bg-inset); padding: 8px 4px; border: 1px solid var(--border); }
 .rc-metric-value { font-family: var(--font-display); font-size: 14px; font-weight: 700; }

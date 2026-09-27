@@ -90,7 +90,7 @@
                 {{ g.brand || '—' }} · 累计 {{ g.total_km }}km / 退役 {{ g.retire_km }}km
               </div>
               <el-progress :percentage="g.wear_pct" :stroke-width="8"
-                           :color="g.flag === 'overdue' ? '#ff6b6b' : g.flag === 'warning' ? '#ffa24d' : '#4ade80'" />
+                           :color="g.flag === 'overdue' ? '#e05f5f' : g.flag === 'warning' ? '#d9a24e' : '#5fc987'" />
               <div style="font-size:12px; margin-top:6px; color:var(--text-2)">
                 {{ g.flag_note || `剩余约 ${g.remaining_km}km` }}
               </div>
@@ -154,7 +154,7 @@ function deltaLabel(pct) {
 const deltaColor = (pct) => {
   if (pct == null) return 'var(--text-2)'
   const v = Math.abs(pct)
-  return v <= 2 ? 'var(--lime)' : v <= 5 ? 'var(--text-2)' : 'var(--orange)'
+  return v <= 2 ? 'var(--jade)' : v <= 5 ? 'var(--text-2)' : 'var(--orange)'
 }
 
 // ---- 比赛成绩 ----
@@ -222,7 +222,7 @@ onMounted(() => { loadRaces(); loadGear() })
 <style scoped>
 .injury-tip {
   margin-top: 8px; padding: 8px 10px; border-radius: 8px; font-size: 12px; line-height: 1.6;
-  background: rgba(255, 107, 107, 0.1); border: 1px solid rgba(255, 107, 107, 0.35);
-  color: #ff9b9b;
+  background: rgba(224, 95, 95, 0.1); border: 1px solid rgba(224, 95, 95, 0.35);
+  color: #ea8a8a;
 }
 </style>

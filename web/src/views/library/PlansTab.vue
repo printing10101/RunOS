@@ -116,7 +116,7 @@ onMounted(async () => {
 .pl-author { font-size: 11px; color: var(--text-3); margin-top: 3px; }
 .pl-stats { font-size: 12px; color: var(--text-2); margin-top: 10px; }
 .pl-stats i { color: var(--text-3); margin: 0 6px; font-style: normal; }
-.pl-fit { font-size: 12px; line-height: 1.7; color: var(--lime-deep); margin-top: 8px; }
+.pl-fit { font-size: 12px; line-height: 1.7; color: var(--jade-deep); margin-top: 8px; }
 .pl-more { border-top: 1px dashed var(--border); margin-top: 6px; }
 .pb-title { font-size: 11px; color: var(--text-3); margin-bottom: 4px; }
 .pb-body { font-size: 12px; line-height: 1.8; color: var(--text-2); }
@@ -127,7 +127,7 @@ onMounted(async () => {
 .pc-item b { display: block; font-size: 11px; margin-bottom: 3px; font-weight: 400; }
 .pc-item.pro b { color: var(--green); }
 .pc-item.con b { color: var(--orange); }
-.pc-item.warn { border-color: rgba(255, 162, 77, .35); }
+.pc-item.warn { border-color: rgba(217, 162, 78, .35); }
 .pc-item.warn b { color: var(--orange); }
 .pb-src { display: flex; gap: 8px; font-size: 12px; margin-top: 8px; align-items: flex-start; }
 .pb-src a { color: var(--blue); text-decoration: none; line-height: 1.6; }

@@ -3,18 +3,18 @@
  * 配色与 main.js 的 CSS 变量体系保持一致。
  */
 export const axisStyle = {
-  axisLine: { lineStyle: { color: 'rgba(148,163,184,.2)' } },
-  axisLabel: { color: '#5f6d80', fontSize: 11 },
+  axisLine: { lineStyle: { color: 'rgba(157,184,173,.2)' } },
+  axisLabel: { color: '#5c6f68', fontSize: 11 },
 }
 
 export const tooltipStyle = {
-  backgroundColor: '#1a2330',
-  borderColor: 'rgba(148,163,184,.2)',
-  textStyle: { color: '#e8eef6' },
+  backgroundColor: '#14251f',
+  borderColor: 'rgba(157,184,173,.2)',
+  textStyle: { color: '#dce8e2' },
 }
 
 /** 通用 splitLine 样式 */
-export const splitLineStyle = { lineStyle: { color: 'rgba(148,163,184,.08)' } }
+export const splitLineStyle = { lineStyle: { color: 'rgba(157,184,173,.08)' } }
 
 /** 通用 legend 样式 */
-export const legendStyle = { textStyle: { color: '#9aa8ba' }, top: 0, itemWidth: 14 }
+export const legendStyle = { textStyle: { color: '#8fada2' }, top: 0, itemWidth: 14 }

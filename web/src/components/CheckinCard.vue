@@ -5,7 +5,7 @@
       <div v-for="q in CHECKIN_QUESTIONS" :key="q.key" class="ck-row">
         <span class="ck-label">{{ q.label }}</span>
         <el-rate v-model="checkinForm[q.key]" :max="q.max" size="small"
-                 :colors="['#ff6b6b', '#ffa24d', '#4ade80']" style="--el-rate-icon-margin: 2px" />
+                 :colors="['#e05f5f', '#d9a24e', '#5fc987']" style="--el-rate-icon-margin: 2px" />
       </div>
       <el-input v-model="checkinPain" size="small" placeholder="疼痛/不适部位（可空）" style="margin-top:6px" />
       <el-button type="primary" size="small" round style="width:100%; margin-top:10px" @click="saveCheckin">提交打卡</el-button>
@@ -51,13 +51,13 @@ const adviceLabel = computed(() => ADVICE_LABELS[checkin.value.advice?.level] ||
 // 补给状态徽标：能量亏缺由饮食联动判定（fueling 来自后端 checkin 建议）
 const fuelingTag = computed(() => {
   const lv = checkin.value.advice?.fueling_level
-  if (lv === 'deficit') return { label: '能量缺口', color: '#ff6b6b' }
-  if (lv === 'low') return { label: '补给偏低', color: '#ffa24d' }
+  if (lv === 'deficit') return { label: '能量缺口', color: '#e05f5f' }
+  if (lv === 'low') return { label: '补给偏低', color: '#d9a24e' }
   return null
 })
 const adviceColor = computed(() => {
   const lv = checkin.value.advice?.level
-  return { normal: '#4ade80', reduce: '#ffa24d', easy: '#ffa24d', rest: '#ff6b6b' }[lv] || '#e8eef6'
+  return { normal: '#5fc987', reduce: '#d9a24e', easy: '#d9a24e', rest: '#e05f5f' }[lv] || '#dce8e2'
 })
 
 async function loadCheckin() {

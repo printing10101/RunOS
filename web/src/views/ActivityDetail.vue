@@ -303,12 +303,12 @@ const extrasText = computed(() => {
 const altPoints = computed(() => (d.value?.series?.points || []).filter(p => p.altitude_m != null))
 
 function paceColor(p) {
-  if (!d.value?.pace_sec_per_km || !p) return '#e8eef6'
+  if (!d.value?.pace_sec_per_km || !p) return '#dce8e2'
   const diff = d.value.pace_sec_per_km - p
-  if (diff > 15) return '#ff6b6b'   // 明显快于平均
-  if (diff > 5) return '#ffa24d'
-  if (diff < -15) return '#5b9dff'
-  return '#e8eef6'
+  if (diff > 15) return '#e05f5f'   // 明显快于平均
+  if (diff > 5) return '#d9a24e'
+  if (diff < -15) return '#5f9fc9'
+  return '#dce8e2'
 }
 
 // 统一管理图表实例：init 去重、窗口缩放自动 resize、卸载时 dispose
@@ -331,24 +331,24 @@ function renderCharts() {
     const chart = charts.get('main', mainChart.value)
     chart.setOption({
       grid: { left: 52, right: hasHr ? 46 : 16, top: 30, bottom: 30 },
-      legend: { textStyle: { color: '#9aa8ba' }, top: 0, itemWidth: 14 },
+      legend: { textStyle: { color: '#8fada2' }, top: 0, itemWidth: 14 },
       tooltip: { trigger: 'axis', ...tooltipStyle,
         valueFormatter: v => (typeof v === 'number' && v > 300) ? fmtPace(v) : v },
       xAxis: { type: 'value', min: 0, max: Math.ceil(lastKm * 10) / 10, ...axisStyle,
         axisLabel: { ...axisStyle.axisLabel, formatter: v => Math.round(v) + 'k' } },
       yAxis: [
-        { type: 'value', inverse: true, ...axisStyle, splitLine: { lineStyle: { color: 'rgba(148,163,184,.08)' } },
+        { type: 'value', inverse: true, ...axisStyle, splitLine: { lineStyle: { color: 'rgba(157,184,173,.08)' } },
           axisLabel: { ...axisStyle.axisLabel, formatter: v => fmtPace(v) } },
         ...(hasHr ? [{ type: 'value', ...axisStyle, splitLine: { show: false }, min: v => Math.floor(v.min / 10) * 10 - 10 }] : []),
       ],
       series: [
         { name: '配速', type: 'line', data: pts.map(p => [p.km, p.pace_sec_per_km]), smooth: true, symbol: 'none',
-          lineStyle: { color: '#c8f169', width: 2.5 }, yAxisIndex: 0 },
+          lineStyle: { color: '#3fd0a4', width: 2.5 }, yAxisIndex: 0 },
         ...(gapSeries.length ? [{ name: 'GAP（坡度调整）', type: 'line', smooth: true, symbol: 'none',
           data: gapSeries,
-          lineStyle: { color: '#56d4e0', width: 1.6, type: 'dashed' }, yAxisIndex: 0 }] : []),
+          lineStyle: { color: '#4fc3c7', width: 1.6, type: 'dashed' }, yAxisIndex: 0 }] : []),
         ...(hasHr ? [{ name: '心率', type: 'line', data: pts.map(p => [p.km, p.hr]), smooth: true, symbol: 'none',
-          lineStyle: { color: '#ff6b6b', width: 1.8 }, yAxisIndex: 1 }] : []),
+          lineStyle: { color: '#e05f5f', width: 1.8 }, yAxisIndex: 1 }] : []),
       ],
     })
   }
@@ -361,15 +361,15 @@ function renderCharts() {
         axisLabel: { ...axisStyle.axisLabel, formatter: v => Math.round(v) + 'k' } },
       yAxis: { type: 'value', ...axisStyle, min: v => Math.floor(v.min - 5), splitLine: { show: false } },
       series: [{ type: 'line', data: altPoints.value.map(p => [p.km, p.altitude_m]), smooth: true, symbol: 'none',
-        lineStyle: { color: '#ffa24d', width: 1.8 },
+        lineStyle: { color: '#d9a24e', width: 1.8 },
         areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: 'rgba(255,162,77,.35)' }, { offset: 1, color: 'rgba(255,162,77,.02)' }]) } }],
+          { offset: 0, color: 'rgba(217,162,78,.35)' }, { offset: 1, color: 'rgba(217,162,78,.02)' }]) } }],
     })
   }
   if (zoneChart.value && d.value.hr_zone_times) {
     const zc = charts.get('zone', zoneChart.value)
-    const zoneMeta = [['Z1', '恢复', '#7d8ea3'], ['Z2', '耐力', '#4ade80'], ['Z3', '有氧', '#56d4e0'],
-                      ['Z4', '阈值', '#ffa24d'], ['Z5', '无氧', '#ff6b6b']]
+    const zoneMeta = [['Z1', '恢复', '#7d938c'], ['Z2', '耐力', '#5fc987'], ['Z3', '有氧', '#4fc3c7'],
+                      ['Z4', '阈值', '#d9a24e'], ['Z5', '无氧', '#e05f5f']]
     const items = zoneMeta.filter(([k]) => d.value.hr_zone_times[k]).map(([k, label, color]) => ({
       key: k, label, color, sec: d.value.hr_zone_times[k] }))
     zc.setOption({
@@ -378,7 +378,7 @@ function renderCharts() {
       xAxis: { type: 'value', ...axisStyle, axisLabel: { ...axisStyle.axisLabel, formatter: v => Math.round(v / 60) + '分' } },
       yAxis: { type: 'category', data: items.map(i => `${i.key} ${i.label}`), ...axisStyle },
       series: [{ type: 'bar', data: items.map(i => ({ value: i.sec, itemStyle: { color: i.color, borderRadius: [0, 4, 4, 0] } })),
-        barWidth: '55%', label: { show: true, position: 'right', color: '#9aa8ba', fontSize: 11,
+        barWidth: '55%', label: { show: true, position: 'right', color: '#8fada2', fontSize: 11,
           formatter: p => `${Math.round(p.value / 60)}′` } }],
     })
   }
@@ -393,11 +393,11 @@ function renderCharts() {
       yAxis: { type: 'value', min: Math.min(...lats) - 0.0006, max: Math.max(...lats) + 0.0006, show: false },
       series: [
         { type: 'line', data: track.map(p => [p[1], p[0]]), symbol: 'none', smooth: true,
-          lineStyle: { color: '#c8f169', width: 2.4 },
-          areaStyle: { color: 'rgba(200,241,105,0.05)' },
+          lineStyle: { color: '#3fd0a4', width: 2.4 },
+          areaStyle: { color: 'rgba(63,208,164,0.05)' },
           markPoint: { symbolSize: 9, label: { show: false },
-            data: [{ coord: track[0].slice().reverse(), itemStyle: { color: '#4ade80' } },
-                   { coord: track[track.length - 1].slice().reverse(), itemStyle: { color: '#ff6b6b' } }] } },
+            data: [{ coord: track[0].slice().reverse(), itemStyle: { color: '#5fc987' } },
+                   { coord: track[track.length - 1].slice().reverse(), itemStyle: { color: '#e05f5f' } }] } },
       ],
     })
   }
@@ -433,7 +433,7 @@ onUnmounted(charts.disposeAll)
 
 .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 10px; }
 .metric { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px 11px; position: relative; overflow: hidden; }
-.metric::after { content: ''; position: absolute; inset: 0 0 auto 0; height: 2px; background: linear-gradient(90deg, var(--lime), transparent 70%); opacity: .7; }
+.metric::after { content: ''; position: absolute; inset: 0 0 auto 0; height: 2px; background: linear-gradient(90deg, var(--jade), transparent 70%); opacity: .7; }
 .m-val { font-size: 25px; color: var(--text); }
 .m-sub { font-size: 13px; color: var(--text-3); margin-left: 1px; }
 .m-label { font-size: 11px; color: var(--text-3); margin-top: 5px; letter-spacing: .04em; }
@@ -446,6 +446,6 @@ onUnmounted(charts.disposeAll)
 .dyn-note { font-size: 11px; color: var(--text-3); margin-top: 3px; }
 .extras { color: var(--text-2); font-size: 13.5px; }
 .coach-comment { color: var(--text-2); font-size: 13.5px; line-height: 1.85;
-  border-left: 3px solid rgba(200, 241, 105, 0.5); padding-left: 12px; }
+  border-left: 3px solid rgba(63, 208, 164, 0.5); padding-left: 12px; }
 .coach-empty { color: var(--text-3); font-size: 13px; }
 </style>

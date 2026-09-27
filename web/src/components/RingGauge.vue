@@ -27,7 +27,7 @@ const props = defineProps({
   unit: { type: String, default: '' },
   sub: { type: String, default: '' },
   sub2: { type: String, default: '' },
-  color: { type: String, default: '#c8f169' },
+  color: { type: String, default: '#3fd0a4' },
   size: { type: Number, default: 132 },
 })
 
@@ -51,7 +51,7 @@ const formattedLabel = computed(() => {
 .ring-wrap { position: relative; display: inline-flex; }
 .ring { transform: rotate(-90deg); }
 .ring-bg, .ring-fg { fill: none; stroke-width: 9; stroke-linecap: round; }
-.ring-bg { stroke: rgba(148, 163, 184, 0.12); }
+.ring-bg { stroke: rgba(157, 184, 173, 0.12); }
 .ring-fg { transition: stroke-dashoffset 0.8s cubic-bezier(0.22, 1, 0.36, 1); }
 .ring-center {
   position: absolute; inset: 0; display: flex; flex-direction: column;

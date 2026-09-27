@@ -127,18 +127,18 @@ function renderBalance() {
   chart.setOption({
     grid: { left: 46, right: 46, top: 30, bottom: 26 },
     tooltip: { trigger: 'axis', ...tooltipStyle },
-    legend: { textStyle: { color: '#9aa8ba' }, top: 0 },
+    legend: { textStyle: { color: '#8fada2' }, top: 0 },
     xAxis: { type: 'category', data: series.map(s => String(s.date).slice(5)), ...axisStyle },
     yAxis: [
-      { type: 'value', ...axisStyle, splitLine: { lineStyle: { color: 'rgba(148,163,184,.08)' } } },
+      { type: 'value', ...axisStyle, splitLine: { lineStyle: { color: 'rgba(157,184,173,.08)' } } },
       { type: 'value', ...axisStyle, splitLine: { show: false } },
     ],
     series: [
       { name: '摄入−目标', type: 'bar', barWidth: '55%',
         data: series.map(s => ({ value: s.balance,
-          itemStyle: { color: s.balance >= 0 ? 'rgba(74,222,128,.7)' : 'rgba(255,107,107,.8)', borderRadius: [3, 3, 0, 0] } })) },
+          itemStyle: { color: s.balance >= 0 ? 'rgba(95, 201, 135,.7)' : 'rgba(224,95,95,.8)', borderRadius: [3, 3, 0, 0] } })) },
       { name: '运动消耗 kcal', type: 'line', yAxisIndex: 1, smooth: true, symbol: 'none',
-        data: series.map(s => s.burned_kcal), lineStyle: { color: '#ffa24d', width: 1.8 } },
+        data: series.map(s => s.burned_kcal), lineStyle: { color: '#d9a24e', width: 1.8 } },
     ],
   })
 }

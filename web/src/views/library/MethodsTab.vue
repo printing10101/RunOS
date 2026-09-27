@@ -27,7 +27,7 @@
           <div class="m-fit">
             <span>亚洲适配</span>
             <el-progress :percentage="m.asian_fit" :stroke-width="6" :show-text="false"
-                         :color="m.asian_fit >= 80 ? '#4ade80' : m.asian_fit >= 65 ? '#ffa24d' : '#5f6d80'"
+                         :color="m.asian_fit >= 80 ? '#5fc987' : m.asian_fit >= 65 ? '#d9a24e' : '#5c6f68'"
                          style="flex:1" />
             <b>{{ m.asian_fit }}</b>
           </div>
@@ -184,7 +184,7 @@ onMounted(async () => {
 .filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 .f-count { margin-left: auto; font-size: 12px; color: var(--text-3); }
 .m-card { cursor: pointer; height: 100%; transition: border-color .15s; }
-.m-card:hover { border-color: var(--lime-deep); }
+.m-card:hover { border-color: var(--jade-deep); }
 .m-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .m-name { font-size: 14px; line-height: 1.4; }
 .m-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
@@ -204,7 +204,7 @@ onMounted(async () => {
   color: var(--text-2); background: var(--bg-inset); border: 1px solid var(--border); }
 .d-pc-item.pro .pc-t { color: var(--green); }
 .d-pc-item.con .pc-t { color: var(--orange); }
-.d-pc-item.warn { border-color: rgba(255, 162, 77, .35); }
+.d-pc-item.warn { border-color: rgba(217, 162, 78, .35); }
 .d-pc-item.warn .pc-t { color: var(--orange); }
 .pc-t { font-size: 11px; margin-bottom: 3px; }
 .basis-row { display: flex; gap: 10px; font-size: 12px; line-height: 1.7; margin-bottom: 5px; }
@@ -220,7 +220,7 @@ onMounted(async () => {
 .src-row a { color: var(--blue); text-decoration: none; line-height: 1.6; }
 .src-note { color: var(--text-3); font-size: 11px; margin-top: 2px; }
 .apply-box { margin-top: 18px; padding: 14px; border-radius: 10px;
-  background: rgba(200, 241, 105, 0.06); border: 1px solid rgba(200, 241, 105, 0.25); }
+  background: rgba(63, 208, 164, 0.06); border: 1px solid rgba(63, 208, 164, 0.25); }
 .apply-t { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .apply-d { font-size: 12px; line-height: 1.7; color: var(--text-2); margin-bottom: 10px; }
 </style>

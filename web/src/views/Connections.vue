@@ -378,14 +378,14 @@ onUnmounted(() => { if (autoTimer) { clearInterval(autoTimer); autoTimer = null 
 
 <style scoped>
 .plat-card :deep(.el-card__body) { padding: 16px 18px; }
-.plat-icon { font-size: 30px; width: 48px; height: 48px; border-radius: 12px; background: rgba(200,241,105,0.1); display: flex; align-items: center; justify-content: center; }
+.plat-icon { font-size: 30px; width: 48px; height: 48px; border-radius: 12px; background: rgba(63,208,164,0.1); display: flex; align-items: center; justify-content: center; }
 .sync-guide { font-size: 13px; color: var(--text-2); line-height: 2; padding-left: 18px; margin: 0; }
-.sync-guide code { background: rgba(148,163,184,.12); border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+.sync-guide code { background: rgba(157,184,173,.12); border-radius: 4px; padding: 1px 6px; font-size: 12px; }
 .reset-tip { font-size: 12.5px; color: var(--text-2); line-height: 1.8; margin-bottom: 12px; }
 .fit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin-bottom: 14px; }
 .fit-row { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; }
 .fit-k { font-size: 12px; color: var(--text-3); }
-.fit-v { font-size: 13.5px; color: var(--lime); }
+.fit-v { font-size: 13.5px; color: var(--jade); }
 .fit-sub { font-size: 12.5px; color: var(--text-2); margin: 4px 0 8px; font-weight: 700; }
 .fit-note { font-size: 12px; color: var(--text-3); line-height: 1.8; border-top: 1px dashed var(--border); padding-top: 10px; margin-top: 4px; }
 </style>

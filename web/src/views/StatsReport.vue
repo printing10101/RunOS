@@ -39,7 +39,7 @@
           <template #header><div class="card-head">连续打卡</div></template>
           <div class="streak-row">
             <div class="streak-box">
-              <div class="num-display streak-num" style="color: var(--lime)"><RollNum :value="d.streak?.current" fallback="" /></div>
+              <div class="num-display streak-num" style="color: var(--jade)"><RollNum :value="d.streak?.current" fallback="" /></div>
               <div class="m-label">当前连续 · 天</div>
             </div>
             <div class="streak-box">
@@ -147,15 +147,15 @@ async function renderCharts() {
     charts.get('cal', calChart.value).setOption({
       tooltip: { ...tooltipStyle, formatter: p => `${p.value[0]}<br/>跑量 ${p.value[1]} km` },
       visualMap: { show: false, min: 0, max: Math.max(12, ...cal.items.map(x => x.km)),
-        inRange: { color: ['rgba(200,241,105,.08)', 'rgba(200,241,105,.35)', '#c8f169'] } },
+        inRange: { color: ['rgba(63,208,164,.08)', 'rgba(63,208,164,.35)', '#3fd0a4'] } },
       calendar: {
         top: 30, left: 44, right: 12, cellSize: ['auto', 15],
         range: [localDateStr(start), localDateStr(end)],
-        splitLine: { lineStyle: { color: 'rgba(148,163,184,.2)' } },
+        splitLine: { lineStyle: { color: 'rgba(157,184,173,.2)' } },
         yearLabel: { show: false },
-        monthLabel: { color: '#5f6d80', fontSize: 10 },
-        dayLabel: { color: '#5f6d80', fontSize: 9, nameMap: ['日', '一', '二', '三', '四', '五', '六'] },
-        itemStyle: { color: 'rgba(148,163,184,.05)', borderColor: '#0b0f14', borderWidth: 2 },
+        monthLabel: { color: '#5c6f68', fontSize: 10 },
+        dayLabel: { color: '#5c6f68', fontSize: 9, nameMap: ['日', '一', '二', '三', '四', '五', '六'] },
+        itemStyle: { color: 'rgba(157,184,173,.05)', borderColor: '#081210', borderWidth: 2 },
       },
       series: [{ type: 'heatmap', coordinateSystem: 'calendar', data }],
     })
@@ -168,11 +168,11 @@ async function renderCharts() {
       grid: { left: 42, right: 10, top: 24, bottom: 26 },
       tooltip: { trigger: 'axis', ...tooltipStyle },
       xAxis: { type: 'category', data: months.map(m => m.month.slice(5)), ...axisStyle },
-      yAxis: { type: 'value', ...axisStyle, splitLine: { lineStyle: { color: 'rgba(148,163,184,.08)' } } },
+      yAxis: { type: 'value', ...axisStyle, splitLine: { lineStyle: { color: 'rgba(157,184,173,.08)' } } },
       series: [{ type: 'bar', data: months.map(m => m.km), barWidth: '55%',
         itemStyle: { borderRadius: [4, 4, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: '#c8f169' }, { offset: 1, color: 'rgba(200,241,105,.2)' }]) } }],
+            { offset: 0, color: '#3fd0a4' }, { offset: 1, color: 'rgba(63,208,164,.2)' }]) } }],
     })
   }
 }
@@ -193,8 +193,8 @@ onUnmounted(charts.disposeAll)
 .streak-num { font-size: 40px; }
 .m-label { font-size: 11px; color: var(--text-3); margin-top: 4px; }
 .highlights { text-align: left; }
-.hl-row { font-size: 12px; color: var(--text-2); padding: 4px 0; border-top: 1px dashed rgba(148,163,184,.1); }
+.hl-row { font-size: 12px; color: var(--text-2); padding: 4px 0; border-top: 1px dashed rgba(157,184,173,.1); }
 .click-table :deep(.el-table__row) { cursor: pointer; }
-.pb-time { font-size: 17px; color: var(--lime); }
+.pb-time { font-size: 17px; color: var(--jade); }
 .pb-note { font-size: 11.5px; color: var(--text-3); margin-top: 10px; }
 </style>

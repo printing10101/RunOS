@@ -82,7 +82,7 @@ onMounted(async () => {
 .p-more { border-top: 1px dashed var(--border); }
 .pb-title { font-size: 11px; color: var(--text-3); margin-bottom: 4px; }
 .pb-body { font-size: 12px; line-height: 1.8; color: var(--text-2); }
-.pb-body.platform { color: var(--lime-deep); }
+.pb-body.platform { color: var(--jade-deep); }
 .pb-list { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.8; color: var(--text-2); }
 .pb-src { display: flex; gap: 8px; font-size: 12px; margin-top: 8px; align-items: flex-start; }
 .pb-src a { color: var(--blue); text-decoration: none; line-height: 1.6; }

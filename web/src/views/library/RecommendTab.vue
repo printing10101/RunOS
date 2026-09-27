@@ -215,7 +215,7 @@ onMounted(async () => {
 .rec-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
 .rec-name { font-size: 15px; }
 .rec-ja { display: block; font-size: 11px; color: var(--text-3); margin-top: 2px; }
-.rec-score { flex-shrink: 0; font-size: 20px; color: var(--lime); font-family: var(--font-display); }
+.rec-score { flex-shrink: 0; font-size: 20px; color: var(--jade); font-family: var(--font-display); }
 .rec-tags { margin: 8px 0; display: flex; gap: 6px; flex-wrap: wrap; }
 .rec-reasons { margin: 6px 0 8px; padding-left: 18px; color: var(--text-2); font-size: 12px; line-height: 1.8; }
 .rec-reasons li { margin: 0; }

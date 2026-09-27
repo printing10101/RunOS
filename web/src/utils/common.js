@@ -51,20 +51,20 @@ export const PLATFORM_NAMES = {
 export function platName(p) { return PLATFORM_NAMES[p] || p }
 
 export const PHASE_NAMES = { base: '基础期', build: '强化期', peak: '巅峰期', taper: '减量期' }
-export const PHASE_COLORS = { base: '#4ade80', build: '#5b9dff', peak: '#ff6b6b', taper: '#ffa24d' }
+export const PHASE_COLORS = { base: '#5fc987', build: '#5f9fc9', peak: '#e05f5f', taper: '#d9a24e' }
 export function phaseName(p) { return PHASE_NAMES[p] || p }
-export function phaseColor(p) { return PHASE_COLORS[p] || '#7d8ea3' }
+export function phaseColor(p) { return PHASE_COLORS[p] || '#7d938c' }
 
-export const GRADE_COLORS = { S: '#f5c26b', A: '#c8f169', B: '#5b9dff', C: '#7d8ea3', D: '#5f6d80' }
-export function gradeColor(g) { return GRADE_COLORS[g] || '#7d8ea3' }
+export const GRADE_COLORS = { S: '#d4b06a', A: '#3fd0a4', B: '#5f9fc9', C: '#7d938c', D: '#5c6f68' }
+export function gradeColor(g) { return GRADE_COLORS[g] || '#7d938c' }
 
 export const STEP_COLORS = {
-  warmup: '#56d4e0', active: '#ff6b6b', rest: '#7d8ea3', cooldown: '#56d4e0', strength: '#5b9dff',
+  warmup: '#4fc3c7', active: '#e05f5f', rest: '#7d938c', cooldown: '#4fc3c7', strength: '#5f9fc9',
 }
-export function stepColor(t) { return STEP_COLORS[t] || '#7d8ea3' }
+export function stepColor(t) { return STEP_COLORS[t] || '#7d938c' }
 
-export const KIND_COLORS = { race: '#f5c26b', quality: '#ff6b6b', long: '#ffa24d', easy: '#4ade80', run: '#4ade80' }
-export function kindColor(k) { return KIND_COLORS[k] || '#5b9dff' }
+export const KIND_COLORS = { race: '#d4b06a', quality: '#e05f5f', long: '#d9a24e', easy: '#5fc987', run: '#5fc987' }
+export function kindColor(k) { return KIND_COLORS[k] || '#5f9fc9' }
 
 /**
  * 下载二进制文件（blob）。统一 resp.ok 检查，避免失败时静默保存损坏文件。
@@ -94,10 +94,10 @@ export async function downloadFile(url, filename, { successTip, failTip } = {}) 
 
 // ACWR 配色按训练学安全线分区（与后端 gear 防伤/状态页阈值同源）：
 // 0.8–1.3 达标；1.3–1.5 偏高；>1.5 高风险；<0.8 负荷不足；无数据中性灰。
-export function acwrColor(v, fallback = '#5f6d80') {
+export function acwrColor(v, fallback = '#5c6f68') {
   if (v == null || isNaN(v)) return fallback
-  if (v > 1.5) return '#ff6b6b'
-  if (v > 1.3) return '#ffa24d'
-  if (v >= 0.8) return '#4ade80'
-  return '#5b9dff'
+  if (v > 1.5) return '#e05f5f'
+  if (v > 1.3) return '#d9a24e'
+  if (v >= 0.8) return '#5fc987'
+  return '#5f9fc9'
 }

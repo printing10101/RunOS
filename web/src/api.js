@@ -75,18 +75,18 @@ export function fmtDate(d) {
 }
 
 export const SESSION_STYLE = {
-  easy: { label: '轻松跑', color: '#4ade80' },
-  quality: { label: '质量课', color: '#ff6b6b' },
-  long: { label: '长距离', color: '#ffa24d' },
-  strength: { label: '力量', color: '#5b9dff' },
-  core: { label: '核心', color: '#7d8ea3' },
-  rest: { label: '休息', color: '#5f6d80' },
-  cross: { label: '交叉', color: '#56d4e0' },
+  easy: { label: '轻松跑', color: '#5fc987' },
+  quality: { label: '质量课', color: '#e05f5f' },
+  long: { label: '长距离', color: '#d9a24e' },
+  strength: { label: '力量', color: '#5f9fc9' },
+  core: { label: '核心', color: '#7d938c' },
+  rest: { label: '休息', color: '#5c6f68' },
+  cross: { label: '交叉', color: '#4fc3c7' },
   // 知识库体验周引入的课型（routers/methods 生成）
-  fartlek: { label: '变速跑', color: '#fb923c' },
-  hill: { label: '坡地跑', color: '#f5c26b' },
-  tempo: { label: '节奏跑', color: '#fb923c' },
-  interval: { label: '间歇跑', color: '#ff6b6b' },
-  recovery: { label: '恢复跑', color: '#4ade80' },
-  race: { label: '比赛', color: '#ff6b6b' },
+  fartlek: { label: '变速跑', color: '#d98f4a' },
+  hill: { label: '坡地跑', color: '#d4b06a' },
+  tempo: { label: '节奏跑', color: '#d98f4a' },
+  interval: { label: '间歇跑', color: '#e05f5f' },
+  recovery: { label: '恢复跑', color: '#5fc987' },
+  race: { label: '比赛', color: '#e05f5f' },
 }

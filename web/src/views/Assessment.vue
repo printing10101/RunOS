@@ -29,9 +29,9 @@
         <el-card shadow="never" style="margin-top:14px">
           <template #header>强度分布（近 6 个月）</template>
           <template v-if="a.intensity_distribution?.easy_pct != null">
-            <el-progress :percentage="a.intensity_distribution.easy_pct" color="#4ade80" :format="() => '轻松 ' + a.intensity_distribution.easy_pct + '%'" />
-            <el-progress :percentage="a.intensity_distribution.moderate_pct" color="#ffa24d" :format="() => '中等 ' + a.intensity_distribution.moderate_pct + '%'" />
-            <el-progress :percentage="a.intensity_distribution.hard_pct" color="#ff6b6b" :format="() => '高强度 ' + a.intensity_distribution.hard_pct + '%'" />
+            <el-progress :percentage="a.intensity_distribution.easy_pct" color="#5fc987" :format="() => '轻松 ' + a.intensity_distribution.easy_pct + '%'" />
+            <el-progress :percentage="a.intensity_distribution.moderate_pct" color="#d9a24e" :format="() => '中等 ' + a.intensity_distribution.moderate_pct + '%'" />
+            <el-progress :percentage="a.intensity_distribution.hard_pct" color="#e05f5f" :format="() => '高强度 ' + a.intensity_distribution.hard_pct + '%'" />
             <el-alert :title="a.intensity_distribution.verdict" :type="a.intensity_distribution.easy_pct >= 70 && a.intensity_distribution.hard_pct <= 25 ? 'success' : 'warning'"
                       :closable="false" show-icon style="margin-top:10px" />
           </template>
@@ -87,7 +87,7 @@
               需要 VDOT {{ a.weakness.goal_gap.required_vdot }} · 当前 {{ a.weakness.goal_gap.current_vdot }}
               （差距 {{ a.weakness.goal_gap.gap }}）
             </span>
-            <div style="font-size:13px; color:#5b9dff; margin-top:4px">{{ a.weakness.goal_gap.verdict }}</div>
+            <div style="font-size:13px; color:#5f9fc9; margin-top:4px">{{ a.weakness.goal_gap.verdict }}</div>
           </div>
           <el-collapse>
             <el-collapse-item v-for="f in a.weakness?.findings || []" :key="f.id">
@@ -135,7 +135,7 @@ const computing = ref(false)
 const openDims = ref(['aerobic', 'willpower', 'talent'])
 
 function dimColor(s) {
-  return s >= 80 ? '#c8f169' : s >= 60 ? '#5b9dff' : s >= 40 ? '#ffa24d' : '#ff6b6b'
+  return s >= 80 ? '#3fd0a4' : s >= 60 ? '#5f9fc9' : s >= 40 ? '#d9a24e' : '#e05f5f'
 }
 
 async function load() {
@@ -159,19 +159,19 @@ function renderRadar() {
     radar: {
       indicator: Object.keys(labels).map(k => ({ name: labels[k], max: 100 })),
       radius: '68%',
-      axisName: { color: '#9aa8ba', fontSize: 12 },
-      splitArea: { areaStyle: { color: ['rgba(148,163,184,0.02)', 'rgba(148,163,184,0.05)'] } },
-      splitLine: { lineStyle: { color: 'rgba(148,163,184,0.12)' } },
-      axisLine: { lineStyle: { color: 'rgba(148,163,184,0.12)' } },
+      axisName: { color: '#8fada2', fontSize: 12 },
+      splitArea: { areaStyle: { color: ['rgba(157,184,173,0.02)', 'rgba(157,184,173,0.05)'] } },
+      splitLine: { lineStyle: { color: 'rgba(157,184,173,0.12)' } },
+      axisLine: { lineStyle: { color: 'rgba(157,184,173,0.12)' } },
     },
     series: [{
       type: 'radar',
       data: [{
         value: Object.keys(labels).map(k => dims[k]?.score ?? 0),
         name: '综合画像',
-        areaStyle: { color: 'rgba(200,241,105,0.18)' },
-        lineStyle: { color: '#c8f169', width: 2.5 },
-        itemStyle: { color: '#c8f169' },
+        areaStyle: { color: 'rgba(63,208,164,0.18)' },
+        lineStyle: { color: '#3fd0a4', width: 2.5 },
+        itemStyle: { color: '#3fd0a4' },
         symbolSize: 5,
       }],
     }],
@@ -187,11 +187,11 @@ onUnmounted(charts.disposeAll)
 .rt-banner :deep(.el-alert__title) { display: flex; align-items: center; flex-wrap: wrap; }
 .score-line { display: flex; gap: 14px; align-items: center; padding: 8px 6px 0; }
 .grade-badge {
-  width: 56px; height: 56px; border-radius: 14px; color: #0b0f14; font-size: 28px; font-weight: 800;
+  width: 56px; height: 56px; border-radius: 14px; color: #081210; font-size: 28px; font-weight: 800;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 .evidence { margin: 4px 0 0; padding-left: 18px; color: var(--text-2); font-size: 13px; line-height: 1.9; }
 .dim-weight { font-size: 11px; color: var(--text-3); width: 32px; text-align: right; }
 .finding-body p { margin: 4px 0; font-size: 13px; color: var(--text-2); line-height: 1.7; }
-.goal-gap { padding: 10px 14px; background: rgba(91, 157, 255, 0.08); border: 1px solid rgba(91, 157, 255, 0.2); border-radius: 8px; margin-bottom: 10px; }
+.goal-gap { padding: 10px 14px; background: rgba(95, 159, 201, 0.08); border: 1px solid rgba(95, 159, 201, 0.2); border-radius: 8px; margin-bottom: 10px; }
 </style>

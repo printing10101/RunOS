@@ -51,14 +51,14 @@
           <template #header><div class="card-head">负荷重点 <span class="card-sub">近 28 天</span></div></template>
           <template v-if="d.load_focus?.available">
             <div class="focus-bar">
-              <div class="fb-seg" :style="{ width: d.load_focus.pct.low_aerobic + '%', background: '#4ade80' }"></div>
-              <div class="fb-seg" :style="{ width: d.load_focus.pct.high_aerobic + '%', background: '#ffa24d' }"></div>
-              <div class="fb-seg" :style="{ width: d.load_focus.pct.anaerobic + '%', background: '#ff6b6b' }"></div>
+              <div class="fb-seg" :style="{ width: d.load_focus.pct.low_aerobic + '%', background: '#5fc987' }"></div>
+              <div class="fb-seg" :style="{ width: d.load_focus.pct.high_aerobic + '%', background: '#d9a24e' }"></div>
+              <div class="fb-seg" :style="{ width: d.load_focus.pct.anaerobic + '%', background: '#e05f5f' }"></div>
             </div>
             <div class="focus-pcts">
-              <span style="color:#4ade80">{{ d.load_focus.pct.low_aerobic }}%</span>
-              <span style="color:#ffa24d">{{ d.load_focus.pct.high_aerobic }}%</span>
-              <span style="color:#ff6b6b">{{ d.load_focus.pct.anaerobic }}%</span>
+              <span style="color:#5fc987">{{ d.load_focus.pct.low_aerobic }}%</span>
+              <span style="color:#d9a24e">{{ d.load_focus.pct.high_aerobic }}%</span>
+              <span style="color:#e05f5f">{{ d.load_focus.pct.anaerobic }}%</span>
             </div>
             <div class="focus-verdict">{{ d.load_focus.verdict }}</div>
             <div class="focus-guide">
@@ -170,7 +170,7 @@
       <el-col :span="8">
         <el-card shadow="never" class="score-card">
           <template #header><div class="card-head">耐力得分 <span class="card-sub">工程估计</span></div></template>
-          <div class="score-num num-display" style="color: var(--lime)">{{ d.endurance_score?.score ?? '-' }}</div>
+          <div class="score-num num-display" style="color: var(--jade)">{{ d.endurance_score?.score ?? '-' }}</div>
           <div class="score-label">{{ d.endurance_score?.label }}</div>
           <div class="score-detail">{{ d.endurance_score?.detail }}</div>
         </el-card>
@@ -189,7 +189,7 @@
           <div v-for="c in d.readiness?.components || []" :key="c.name" class="comp-row">
             <div class="comp-head"><span>{{ c.name }}</span><span class="comp-score">{{ c.score }}</span></div>
             <el-progress :percentage="c.score" :show-text="false" :stroke-width="6"
-                         :color="c.score >= 75 ? '#4ade80' : c.score >= 50 ? '#ffa24d' : '#ff6b6b'" />
+                         :color="c.score >= 75 ? '#5fc987' : c.score >= 50 ? '#d9a24e' : '#e05f5f'" />
             <div class="comp-detail">{{ c.detail }}</div>
           </div>
           <div v-if="!d.readiness?.components?.length" class="rec-note">接入佳明或手动录入身体数据后启用睡眠/HRV 分量</div>
@@ -225,7 +225,7 @@ const insightCards = computed(() => [
 
 function insVerdictColor(data) {
   const v = data?.verdict
-  return v === 'good' ? 'var(--lime)' : v === 'watch' ? 'var(--orange)' : 'var(--red)'
+  return v === 'good' ? 'var(--jade)' : v === 'watch' ? 'var(--orange)' : 'var(--red)'
 }
 
 async function loadAll() {
@@ -247,34 +247,34 @@ async function loadAll() {
 
 const readyColor = computed(() => {
   const s = d.value.readiness?.score || 0
-  return s >= 80 ? '#4ade80' : s >= 60 ? '#ffa24d' : '#ff6b6b'
+  return s >= 80 ? '#5fc987' : s >= 60 ? '#d9a24e' : '#e05f5f'
 })
 const acwrColor = computed(() => {
   const v = d.value.acwr
-  if (v == null) return '#e8eef6'
-  return v >= 0.8 && v <= 1.3 ? '#4ade80' : v > 1.5 ? '#ff6b6b' : '#ffa24d'
+  if (v == null) return '#dce8e2'
+  return v >= 0.8 && v <= 1.3 ? '#5fc987' : v > 1.5 ? '#e05f5f' : '#d9a24e'
 })
 const monoColor = computed(() => {
   const v = d.value.monotony?.monotony
-  if (v == null) return '#e8eef6'
-  return v <= 1.5 ? '#4ade80' : v <= 2.0 ? '#ffa24d' : '#ff6b6b'
+  if (v == null) return '#dce8e2'
+  return v <= 1.5 ? '#5fc987' : v <= 2.0 ? '#d9a24e' : '#e05f5f'
 })
 const efColor = computed(() => {
   const v = d.value.aerobic_efficiency?.delta_pct
-  if (v == null) return '#e8eef6'
-  return v >= 1.5 ? '#4ade80' : v <= -1.5 ? '#ff6b6b' : '#5b9dff'
+  if (v == null) return '#dce8e2'
+  return v >= 1.5 ? '#5fc987' : v <= -1.5 ? '#e05f5f' : '#5f9fc9'
 })
 const raceFormColor = computed(() => {
   const v = fc.value.race?.tsb_on_race
-  if (v == null) return '#e8eef6'
-  return v >= -15 && v <= 10 ? '#4ade80' : v < -15 ? '#ff6b6b' : '#ffa24d'
+  if (v == null) return '#dce8e2'
+  return v >= -15 && v <= 10 ? '#5fc987' : v < -15 ? '#e05f5f' : '#d9a24e'
 })
 const focusGuide = computed(() => {
   const f = d.value.load_focus || {}
   return [
-    { label: '低强度有氧', color: '#4ade80', range: `${f.guide?.low_aerobic?.[0]}-${f.guide?.low_aerobic?.[1]}%` },
-    { label: '高强度有氧', color: '#ffa24d', range: `${f.guide?.high_aerobic?.[0]}-${f.guide?.high_aerobic?.[1]}%` },
-    { label: '无氧', color: '#ff6b6b', range: `≤${f.guide?.anaerobic?.[1]}%` },
+    { label: '低强度有氧', color: '#5fc987', range: `${f.guide?.low_aerobic?.[0]}-${f.guide?.low_aerobic?.[1]}%` },
+    { label: '高强度有氧', color: '#d9a24e', range: `${f.guide?.high_aerobic?.[0]}-${f.guide?.high_aerobic?.[1]}%` },
+    { label: '无氧', color: '#e05f5f', range: `≤${f.guide?.anaerobic?.[1]}%` },
   ]
 })
 
@@ -291,11 +291,11 @@ function renderCharts() {
       { name: '当日负荷', type: 'bar', data: days.map(x => x.load), barWidth: '62%',
         itemStyle: { borderRadius: [3, 3, 0, 0],
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(91,157,255,.85)' }, { offset: 1, color: 'rgba(91,157,255,.15)' }]) } },
+            { offset: 0, color: 'rgba(95,159,201,.85)' }, { offset: 1, color: 'rgba(95,159,201,.15)' }]) } },
       { name: '7 天均值', type: 'line', symbol: 'none', smooth: true, data: rolling(days, 7),
-        lineStyle: { color: '#ff6b6b', width: 2 } },
+        lineStyle: { color: '#e05f5f', width: 2 } },
       { name: '28 天均值', type: 'line', symbol: 'none', smooth: true, data: rolling(days, 28),
-        lineStyle: { color: '#c8f169', width: 2 } },
+        lineStyle: { color: '#3fd0a4', width: 2 } },
     ],
   })
 
@@ -305,26 +305,26 @@ function renderCharts() {
     const fci = charts.get('forecast', fcChart.value)
     fci.setOption({
       grid: { left: 46, right: 16, top: 34, bottom: 26 },
-      legend: { textStyle: { color: '#9aa8ba' }, top: 0, itemWidth: 14 },
+      legend: { textStyle: { color: '#8fada2' }, top: 0, itemWidth: 14 },
       tooltip: { trigger: 'axis', ...tooltipStyle },
       xAxis: { type: 'category', data: s.map(x => x.date.slice(5)), ...axisStyle,
         axisLabel: { ...axisStyle.axisLabel, interval: 6 } },
-      yAxis: { type: 'value', ...axisStyle, splitLine: { lineStyle: { color: 'rgba(148,163,184,.08)' } } },
+      yAxis: { type: 'value', ...axisStyle, splitLine: { lineStyle: { color: 'rgba(157,184,173,.08)' } } },
       series: [
         { name: '实际负荷', type: 'bar', stack: 'load', barWidth: '62%',
           data: s.map(x => (x.planned ? null : x.load)),
-          itemStyle: { color: 'rgba(91,157,255,.75)', borderRadius: [3, 3, 0, 0] } },
+          itemStyle: { color: 'rgba(95,159,201,.75)', borderRadius: [3, 3, 0, 0] } },
         { name: '计划负荷', type: 'bar', stack: 'load', barWidth: '62%',
           data: s.map(x => (x.planned ? x.load : null)),
-          itemStyle: { color: 'rgba(255,162,77,.6)', borderRadius: [3, 3, 0, 0] } },
+          itemStyle: { color: 'rgba(217,162,78,.6)', borderRadius: [3, 3, 0, 0] } },
         { name: '体能 CTL', type: 'line', symbol: 'none', smooth: true, data: s.map(x => x.ctl),
-          lineStyle: { color: '#c8f169', width: 2 } },
+          lineStyle: { color: '#3fd0a4', width: 2 } },
         { name: '疲劳 ATL', type: 'line', symbol: 'none', smooth: true, data: s.map(x => x.atl),
-          lineStyle: { color: '#ff6b6b', width: 1.6 } },
+          lineStyle: { color: '#e05f5f', width: 1.6 } },
         { name: '形态 TSB', type: 'line', symbol: 'none', smooth: true, data: s.map(x => x.tsb),
-          lineStyle: { color: '#56d4e0', width: 1.6, type: 'dashed' },
+          lineStyle: { color: '#4fc3c7', width: 1.6, type: 'dashed' },
           markLine: fc.value.race ? {
-            symbol: 'none', label: { color: '#f5c26b', formatter: '比赛日' },
+            symbol: 'none', label: { color: '#d4b06a', formatter: '比赛日' },
             lineStyle: { color: 'rgba(245,194,107,.6)', type: 'dotted' },
             data: [{ xAxis: fc.value.race.date.slice(5) }],
           } : undefined },
@@ -347,7 +347,7 @@ onUnmounted(charts.disposeAll)
 <style scoped>
 
 .status-card .status-label { font-size: 38px; margin: 6px 0 8px; }
-.st-peaking .status-label, .st-productive .status-label { color: var(--lime); }
+.st-peaking .status-label, .st-productive .status-label { color: var(--jade); }
 .st-maintaining .status-label { color: var(--blue); }
 .st-unproductive, .st-strained, .st-detached { --status: var(--red); }
 .st-unproductive .status-label, .st-strained .status-label, .st-detached .status-label { color: var(--red); }
@@ -358,7 +358,7 @@ onUnmounted(charts.disposeAll)
 .ready-wrap { display: flex; justify-content: center; padding: 6px 0; }
 .ready-verdict { text-align: center; color: var(--text-2); font-size: 12.5px; margin-top: 4px; }
 
-.rec-row { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-bottom: 1px dashed rgba(148,163,184,.12); }
+.rec-row { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; border-bottom: 1px dashed rgba(157,184,173,.12); }
 .rec-k { color: var(--text-2); font-size: 13px; }
 .rec-v { font-size: 30px; color: var(--text); }
 .rec-u { font-size: 13px; color: var(--text-3); margin-left: 2px; }

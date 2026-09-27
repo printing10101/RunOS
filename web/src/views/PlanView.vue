@@ -118,7 +118,7 @@
                        :label="`${g.target_label || g.race_type} ${g.target_date || ''}`" />
           </el-select>
           <div v-if="!goals.length" class="form-tip" style="margin-top:6px">
-            还没有比赛目标，先到「<router-link to="/settings?tab=profile" style="color:var(--lime)">设置 → 个人档案</router-link>」添加一个目标
+            还没有比赛目标，先到「<router-link to="/settings?tab=profile" style="color:var(--jade)">设置 → 个人档案</router-link>」添加一个目标
           </div>
         </el-form-item>
         <el-form-item label="开始日期">
@@ -183,8 +183,8 @@ const genForm = ref({ goal_id: null, start_date: null, weekly_km_peak: null })
 
 const WEEKDAY = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 const phases = [
-  { k: 'base', t: '基础期', c: '#4ade80' }, { k: 'build', t: '强化期', c: '#5b9dff' },
-  { k: 'peak', t: '巅峰期', c: '#ff6b6b' }, { k: 'taper', t: '减量期', c: '#ffa24d' },
+  { k: 'base', t: '基础期', c: '#5fc987' }, { k: 'build', t: '强化期', c: '#5f9fc9' },
+  { k: 'peak', t: '巅峰期', c: '#e05f5f' }, { k: 'taper', t: '减量期', c: '#d9a24e' },
 ]
 
 const connectedAny = computed(() => conn.value.connections.some(c => c.status === 'connected'))
@@ -227,14 +227,14 @@ function mindTag(wo) {
   const t = wo.session_type
   if (t === 'quality') {
     const s = wo.title || ''
-    if (s.includes('间歇')) return { label: '间歇跑', color: '#ff6b6b' }
-    if (s.includes('巡航') || s.includes('节奏')) return { label: '节奏跑', color: '#fb923c' }
-    if (s.includes('马配') || s.includes('马拉松')) return { label: '马拉松配速', color: '#ff6b6b' }
-    if (s.includes('激活')) return { label: '赛前激活', color: '#5b9dff' }
-    return { label: '质量课', color: '#ff6b6b' }
+    if (s.includes('间歇')) return { label: '间歇跑', color: '#e05f5f' }
+    if (s.includes('巡航') || s.includes('节奏')) return { label: '节奏跑', color: '#d98f4a' }
+    if (s.includes('马配') || s.includes('马拉松')) return { label: '马拉松配速', color: '#e05f5f' }
+    if (s.includes('激活')) return { label: '赛前激活', color: '#5f9fc9' }
+    return { label: '质量课', color: '#e05f5f' }
   }
   const base = SESSION_STYLE[t]
-  return base ? { label: base.label, color: base.color } : { label: t, color: '#7d8ea3' }
+  return base ? { label: base.label, color: base.color } : { label: t, color: '#7d938c' }
 }
 
 async function load() {
@@ -398,7 +398,7 @@ onMounted(load)
 <style scoped>
 .plan-name { font-size: 17px; font-weight: 800; }
 .plan-meta { color: var(--text-3); font-size: 13px; margin-top: 5px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.target-chip { background: rgba(200, 241, 105, 0.14); color: var(--lime); border: 1px solid rgba(200, 241, 105, 0.3); font-weight: 700; }
+.target-chip { background: rgba(63, 208, 164, 0.14); color: var(--jade); border: 1px solid rgba(63, 208, 164, 0.3); font-weight: 700; }
 .plan-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px; }
 .phase-legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-2); }
 .phase-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; }
@@ -411,29 +411,29 @@ onMounted(load)
 .day-head { font-size: 12px; color: var(--text-3); margin-bottom: 6px; display: flex; align-items: center; gap: 5px; }
 .day-head span { margin-left: auto; }
 /* 「今天」标记：让用户一眼定位当前处在计划的哪一天 */
-.day-today-tag { font-style: normal; font-size: 10px; font-weight: 700; color: var(--lime);
-  background: rgba(200, 241, 105, 0.14); border: 1px solid rgba(200, 241, 105, 0.3);
+.day-today-tag { font-style: normal; font-size: 10px; font-weight: 700; color: var(--jade);
+  background: rgba(63, 208, 164, 0.14); border: 1px solid rgba(63, 208, 164, 0.3);
   border-radius: 5px; padding: 0 4px; line-height: 15px; }
-.day-col.day-today { background: rgba(200, 241, 105, 0.06); border-radius: 10px;
-  box-shadow: inset 0 0 0 1px rgba(200, 241, 105, 0.25); }
+.day-col.day-today { background: rgba(63, 208, 164, 0.06); border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(63, 208, 164, 0.25); }
 .day-col.day-today .day-head { color: var(--text-1); font-weight: 700; }
 .wo-card {
   border: 1px solid var(--border); border-left: 3px solid var(--text-3); border-radius: 10px;
   padding: 9px; background: var(--bg-inset); cursor: pointer;
 }
 .wo-done { opacity: .78; }
-.wo-easy { border-left-color: #4ade80; }
-.wo-quality { border-left-color: #ff6b6b; }
-.wo-long { border-left-color: #ffa24d; }
-.wo-strength { border-left-color: #5b9dff; }
+.wo-easy { border-left-color: #5fc987; }
+.wo-quality { border-left-color: #e05f5f; }
+.wo-long { border-left-color: #d9a24e; }
+.wo-strength { border-left-color: #5f9fc9; }
 .wo-title { font-size: 13px; font-weight: 700; line-height: 1.35; }
 .wo-tag { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 8px; margin-bottom: 4px; letter-spacing: .02em; }
 .wo-meta { font-size: 12px; color: var(--text-3); margin: 4px 0; font-family: var(--font-display); letter-spacing: .04em; }
-.wo-tip { font-size: 11px; color: var(--orange); background: rgba(255, 162, 77, 0.08); border-radius: 5px; padding: 2px 6px; margin-bottom: 7px; }
+.wo-tip { font-size: 11px; color: var(--orange); background: rgba(217, 162, 78, 0.08); border-radius: 5px; padding: 2px 6px; margin-bottom: 7px; }
 .wo-comment { margin-top: 6px; }
 .wc-text {
   font-size: 11px; color: var(--text-2); line-height: 1.55;
-  background: rgba(200, 241, 105, 0.06); border: 1px dashed rgba(200, 241, 105, 0.25);
+  background: rgba(63, 208, 164, 0.06); border: 1px dashed rgba(63, 208, 164, 0.25);
   border-radius: 6px; padding: 4px 7px; cursor: default;
   display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
 }
@@ -443,9 +443,9 @@ onMounted(load)
 .wo-actions .el-button { padding: 4px 10px; margin-left: 0; }
 .rest-day {
   color: var(--text-3); font-size: 12px; text-align: center; padding: 18px 0;
-  border: 1px dashed rgba(148, 163, 184, 0.2); border-radius: 10px;
+  border: 1px dashed rgba(157, 184, 173, 0.2); border-radius: 10px;
 }
-.step-row { padding: 10px 0; border-bottom: 1px dashed rgba(148, 163, 184, 0.12); }
+.step-row { padding: 10px 0; border-bottom: 1px dashed rgba(157, 184, 173, 0.12); }
 .form-tip { font-size: 11px; color: var(--text-3); line-height: 1.4; }
-.ai-parse-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 13.5px; color: var(--text-2); border-bottom: 1px dashed rgba(148, 163, 184, 0.1); }
+.ai-parse-row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 13.5px; color: var(--text-2); border-bottom: 1px dashed rgba(157, 184, 173, 0.1); }
 </style>

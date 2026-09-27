@@ -63,22 +63,22 @@ describe('展示映射的兜底值', () => {
   })
 
   it('取色函数未知 key 回落灰色而不是 undefined', () => {
-    expect(phaseColor('build')).toBe('#5b9dff')
-    expect(phaseColor('nope')).toBe('#7d8ea3')
-    expect(gradeColor('S')).toBe('#f5c26b')
-    expect(gradeColor('Z')).toBe('#7d8ea3')
-    expect(stepColor('warmup')).toBe('#56d4e0')
-    expect(stepColor('nope')).toBe('#7d8ea3')
-    expect(kindColor('quality')).toBe('#ff6b6b')
-    expect(kindColor('nope')).toBe('#5b9dff')
+    expect(phaseColor('build')).toBe('#5f9fc9')
+    expect(phaseColor('nope')).toBe('#7d938c')
+    expect(gradeColor('S')).toBe('#d4b06a')
+    expect(gradeColor('Z')).toBe('#7d938c')
+    expect(stepColor('warmup')).toBe('#4fc3c7')
+    expect(stepColor('nope')).toBe('#7d938c')
+    expect(kindColor('quality')).toBe('#e05f5f')
+    expect(kindColor('nope')).toBe('#5f9fc9')
   })
 
   it('acwrColor 按训练学安全线分区（与后端 review_guard 同源阈值）', () => {
-    expect(acwrColor(null)).toBe('#5f6d80') // 无数据走中性灰
-    expect(acwrColor(1.0)).toBe('#4ade80') // 0.8–1.3 达标
-    expect(acwrColor(0.8)).toBe('#4ade80')
-    expect(acwrColor(1.3)).toBe('#4ade80')
-    expect(acwrColor(1.4)).toBe('#ffa24d') // 1.3–1.5 偏高
-    expect(acwrColor(1.6)).toBe('#ff6b6b') // >1.5 高风险
+    expect(acwrColor(null)).toBe('#5c6f68') // 无数据走中性灰
+    expect(acwrColor(1.0)).toBe('#5fc987') // 0.8–1.3 达标
+    expect(acwrColor(0.8)).toBe('#5fc987')
+    expect(acwrColor(1.3)).toBe('#5fc987')
+    expect(acwrColor(1.4)).toBe('#d9a24e') // 1.3–1.5 偏高
+    expect(acwrColor(1.6)).toBe('#e05f5f') // >1.5 高风险
   })
 })

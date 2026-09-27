@@ -33,7 +33,7 @@
             <el-table-column label="当前水平" min-width="160">
               <template #default="{ row }">
                 <el-progress :percentage="row.bar" :stroke-width="8" :show-text="false"
-                             :color="row.key === 'marathon' ? '#ff6b6b' : '#5b9dff'" />
+                             :color="row.key === 'marathon' ? '#e05f5f' : '#5f9fc9'" />
               </template>
             </el-table-column>
           </el-table>
@@ -59,7 +59,7 @@
             </div>
           </template>
           <div class="ceiling-hero" v-if="ceiling.total_headroom_pct != null">
-            <div class="stat-num" style="color:var(--lime)">+{{ ceiling.total_headroom_pct }}%</div>
+            <div class="stat-num" style="color:var(--jade)">+{{ ceiling.total_headroom_pct }}%</div>
             <div class="stat-label">预计提升空间 · 约 {{ ceiling.years_to_ceiling }} 年达到</div>
           </div>
           <el-table :data="ceilingRows" size="small" style="margin-top:8px">
@@ -69,7 +69,7 @@
             </el-table-column>
             <el-table-column label="生涯最佳">
               <template #default="{ row }">
-                <b style="color:var(--lime)">{{ row.career_best }}</b>
+                <b style="color:var(--jade)">{{ row.career_best }}</b>
               </template>
             </el-table-column>
           </el-table>
@@ -77,7 +77,7 @@
           <div style="font-size:13px; font-weight:600; color:var(--text); margin-bottom:8px">提升空间构成</div>
           <div v-for="(v, k) in ceiling.headroom_components" :key="k" class="hc-row">
             <span>{{ k }}</span>
-            <el-progress :percentage="parseFloat(v) * 4" :stroke-width="8" :show-text="false" color="#60a5fa" style="flex:1; margin:0 10px" />
+            <el-progress :percentage="parseFloat(v) * 4" :stroke-width="8" :show-text="false" color="#6da8d4" style="flex:1; margin:0 10px" />
             <b style="width:44px; text-align:right">{{ v }}</b>
           </div>
           <el-alert :title="ceiling.disclaimer" type="info" :closable="false" show-icon style="margin-top:12px"
@@ -145,13 +145,13 @@ function render() {
   charts.get('ceiling', ceilingChart.value).setOption({
     grid: { left: 44, right: 16, top: 30, bottom: 26 },
     tooltip: { trigger: 'axis', ...tooltipStyle },
-    legend: { top: 0, textStyle: { color: '#9aa8ba' } },
+    legend: { top: 0, textStyle: { color: '#8fada2' } },
     xAxis: { type: 'category', data: rows.map(r => r.label), ...axisStyle },
-    yAxis: { type: 'value', name: '分钟', nameTextStyle: { color: '#5f6d80' }, ...axisStyle, splitLine: splitLineStyle },
+    yAxis: { type: 'value', name: '分钟', nameTextStyle: { color: '#5c6f68' }, ...axisStyle, splitLine: splitLineStyle },
     series: [
-      { name: '当前预测', type: 'bar', barWidth: 22, itemStyle: { color: 'rgba(91,157,255,0.55)', borderRadius: [6, 6, 0, 0] },
+      { name: '当前预测', type: 'bar', barWidth: 22, itemStyle: { color: 'rgba(95,159,201,0.55)', borderRadius: [6, 6, 0, 0] },
         data: rows.map(r => +toMin(r.current).toFixed(1)) },
-      { name: '生涯上限', type: 'bar', barWidth: 22, itemStyle: { color: '#c8f169', borderRadius: [6, 6, 0, 0] },
+      { name: '生涯上限', type: 'bar', barWidth: 22, itemStyle: { color: '#3fd0a4', borderRadius: [6, 6, 0, 0] },
         data: rows.map(r => +(r.career_best_sec / 60).toFixed(1)) },
     ],
   })

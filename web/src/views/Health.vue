@@ -73,7 +73,7 @@
           <div class="m-label">压力分数</div>
         </div>
         <div class="metric" v-if="latest('body_battery') != null">
-          <div class="num-display m-val" style="color: var(--lime)">{{ latest('body_battery') }}</div>
+          <div class="num-display m-val" style="color: var(--jade)">{{ latest('body_battery') }}</div>
           <div class="m-label">身体电量</div>
         </div>
       </div>
@@ -207,17 +207,17 @@ const hrvStatusText = computed(() => {
 const hrvColor = computed(() => {
   const base = d.value.baseline?.hrv_baseline
   const cur = latest('hrv_rmssd')
-  if (!base || cur == null) return '#e8eef6'
-  return cur / base >= 0.95 ? '#4ade80' : cur / base >= 0.85 ? '#ffa24d' : '#ff6b6b'
+  if (!base || cur == null) return '#dce8e2'
+  return cur / base >= 0.95 ? '#5fc987' : cur / base >= 0.85 ? '#d9a24e' : '#e05f5f'
 })
 const stressColor = computed(() => {
   const s = latest('stress')
-  if (s == null) return '#e8eef6'
-  return s <= 40 ? '#4ade80' : s <= 60 ? '#ffa24d' : '#ff6b6b'
+  if (s == null) return '#dce8e2'
+  return s <= 40 ? '#5fc987' : s <= 60 ? '#d9a24e' : '#e05f5f'
 })
 
-const OV_STATUS_COLOR = { '平衡': '#4ade80', '偏低': '#ffa24d', '不平衡': '#ff6b6b' }
-const ovHrvColor = computed(() => OV_STATUS_COLOR[overview.value?.hrv?.status] || '#e8eef6')
+const OV_STATUS_COLOR = { '平衡': '#5fc987', '偏低': '#d9a24e', '不平衡': '#e05f5f' }
+const ovHrvColor = computed(() => OV_STATUS_COLOR[overview.value?.hrv?.status] || '#dce8e2')
 
 // 连续打卡天数：从今天往回数；今天还没打不算断档（从昨天起算）
 const checkinStreak = computed(() => {
@@ -248,20 +248,20 @@ function renderCharts() {
       const bandLo = bandBase != null && bl.spread != null ? bandBase - 2 * bl.spread : null
       charts.get('hrv', hrvChart.value).setOption({
         grid, tooltip: { trigger: 'axis', ...tooltipStyle },
-        legend: { textStyle: { color: '#9aa8ba' }, top: 0, data: ['HRV', '档案基线'] },
+        legend: { textStyle: { color: '#8fada2' }, top: 0, data: ['HRV', '档案基线'] },
         xAxis: { type: 'category', data: dates, ...axisStyle, axisLabel: { ...axisStyle.axisLabel, interval: 12 } },
-        yAxis: { type: 'value', ...axisStyle, scale: true, splitLine: { lineStyle: { color: 'rgba(148,163,184,.08)' } } },
+        yAxis: { type: 'value', ...axisStyle, scale: true, splitLine: { lineStyle: { color: 'rgba(157,184,173,.08)' } } },
         series: [
           ...(bandUp != null ? [
             { name: '基线上界', type: 'line', data: dates.map(() => bandUp), symbol: 'none',
-              lineStyle: { color: 'rgba(95,109,128,0.5)', type: 'dotted', width: 1 }, stack: 'band', silent: true },
+              lineStyle: { color: 'rgba(92,111,104,0.5)', type: 'dotted', width: 1 }, stack: 'band', silent: true },
             { name: '基线带', type: 'line', data: dates.map(() => bandLo - bandUp), symbol: 'none',
-              lineStyle: { opacity: 0 }, stack: 'band', areaStyle: { color: 'rgba(95,109,128,0.10)' }, silent: true },
+              lineStyle: { opacity: 0 }, stack: 'band', areaStyle: { color: 'rgba(92,111,104,0.10)' }, silent: true },
           ] : []),
           ...(base ? [{ name: '档案基线', type: 'line', data: dates.map(() => base), symbol: 'none',
-            lineStyle: { color: '#5f6d80', type: 'dashed', width: 1.2 } }] : []),
+            lineStyle: { color: '#5c6f68', type: 'dashed', width: 1.2 } }] : []),
           { name: 'HRV', type: 'line', data: vals, smooth: true, symbol: 'circle', symbolSize: 3,
-            lineStyle: { color: '#56d4e0', width: 2 },
+            lineStyle: { color: '#4fc3c7', width: 2 },
             areaStyle: { color: 'rgba(86,212,224,0.08)' } },
         ],
       })
@@ -273,18 +273,18 @@ function renderCharts() {
     if (hours.some(v => v != null)) {
       charts.get('sleep', sleepChart.value).setOption({
         grid, tooltip: { trigger: 'axis', ...tooltipStyle },
-        legend: { textStyle: { color: '#9aa8ba' }, top: 0 },
+        legend: { textStyle: { color: '#8fada2' }, top: 0 },
         xAxis: { type: 'category', data: dates, ...axisStyle, axisLabel: { ...axisStyle.axisLabel, interval: 12 } },
         yAxis: [
-          { type: 'value', ...axisStyle, max: v => Math.ceil(v.max + 1), splitLine: { lineStyle: { color: 'rgba(148,163,184,.08)' } } },
+          { type: 'value', ...axisStyle, max: v => Math.ceil(v.max + 1), splitLine: { lineStyle: { color: 'rgba(157,184,173,.08)' } } },
           { type: 'value', ...axisStyle, min: 0, max: 100, splitLine: { show: false } },
         ],
         series: [
           { name: '时长(h)', type: 'bar', data: hours.map(v => ({ value: v,
-              itemStyle: { color: v >= 7 ? 'rgba(74,222,128,.75)' : 'rgba(255,162,77,.8)', borderRadius: [3, 3, 0, 0] } })),
+              itemStyle: { color: v >= 7 ? 'rgba(95, 201, 135,.75)' : 'rgba(217,162,78,.8)', borderRadius: [3, 3, 0, 0] } })),
             barWidth: '60%' },
           ...(scores.some(v => v != null) ? [{ name: '分数', type: 'line', yAxisIndex: 1, data: scores,
-            symbol: 'none', smooth: true, lineStyle: { color: '#5b9dff', width: 1.8 } }] : []),
+            symbol: 'none', smooth: true, lineStyle: { color: '#5f9fc9', width: 1.8 } }] : []),
         ],
       })
     }
@@ -294,17 +294,17 @@ function renderCharts() {
     if (w.some(v => v != null)) {
       charts.get('weight', weightChart.value).setOption({
         grid, tooltip: { trigger: 'axis', ...tooltipStyle },
-        legend: { textStyle: { color: '#9aa8ba' }, top: 0 },
+        legend: { textStyle: { color: '#8fada2' }, top: 0 },
         xAxis: { type: 'category', data: dates, ...axisStyle, axisLabel: { ...axisStyle.axisLabel, interval: 12 } },
         yAxis: [
-          { type: 'value', ...axisStyle, scale: true, splitLine: { lineStyle: { color: 'rgba(148,163,184,.08)' } } },
+          { type: 'value', ...axisStyle, scale: true, splitLine: { lineStyle: { color: 'rgba(157,184,173,.08)' } } },
           { type: 'value', ...axisStyle, scale: true, splitLine: { show: false } },
         ],
         series: [
           { name: '体重 kg', type: 'line', data: w, smooth: true, symbol: 'circle', symbolSize: 3,
-            lineStyle: { color: '#c8f169', width: 2 } },
+            lineStyle: { color: '#3fd0a4', width: 2 } },
           ...(f.some(v => v != null) ? [{ name: '体脂 %', type: 'line', yAxisIndex: 1, data: f,
-            symbol: 'none', smooth: true, lineStyle: { color: '#ffa24d', width: 1.6, type: 'dashed' } }] : []),
+            symbol: 'none', smooth: true, lineStyle: { color: '#d9a24e', width: 1.6, type: 'dashed' } }] : []),
         ],
       })
     }
@@ -315,10 +315,10 @@ function renderCharts() {
       charts.get('rhr', rhrChart.value).setOption({
         grid, tooltip: { trigger: 'axis', ...tooltipStyle },
         xAxis: { type: 'category', data: dates, ...axisStyle, axisLabel: { ...axisStyle.axisLabel, interval: 12 } },
-        yAxis: { type: 'value', ...axisStyle, scale: true, splitLine: { lineStyle: { color: 'rgba(148,163,184,.08)' } } },
+        yAxis: { type: 'value', ...axisStyle, scale: true, splitLine: { lineStyle: { color: 'rgba(157,184,173,.08)' } } },
         series: [{ name: '静息心率', type: 'line', data: vals, smooth: true, symbol: 'circle', symbolSize: 3,
-          lineStyle: { color: '#ff6b6b', width: 2 },
-          areaStyle: { color: 'rgba(255,107,107,0.06)' } }],
+          lineStyle: { color: '#e05f5f', width: 2 },
+          areaStyle: { color: 'rgba(224,95,95,0.06)' } }],
       })
     }
   }
@@ -330,21 +330,21 @@ function renderCheckinChart() {
   charts.get('checkin', checkinChart.value).setOption({
     grid: { left: 34, right: 16, top: 30, bottom: 26 },
     tooltip: { trigger: 'axis', ...tooltipStyle },
-    legend: { textStyle: { color: '#9aa8ba' }, top: 0 },
+    legend: { textStyle: { color: '#8fada2' }, top: 0 },
     xAxis: { type: 'category', data: items.map(i => String(i.date).slice(5)),
              ...axisStyle, axisLabel: { ...axisStyle.axisLabel, interval: 3 } },
     yAxis: { type: 'value', min: 0, max: 5, interval: 1, ...axisStyle,
-             splitLine: { lineStyle: { color: 'rgba(148,163,184,.08)' } } },
+             splitLine: { lineStyle: { color: 'rgba(157,184,173,.08)' } } },
     series: [
       { name: '睡眠质量', type: 'line', data: items.map(i => i.sleep_quality), smooth: true,
-        symbol: 'circle', symbolSize: 4, lineStyle: { color: '#5b9dff', width: 2 }, itemStyle: { color: '#5b9dff' } },
+        symbol: 'circle', symbolSize: 4, lineStyle: { color: '#5f9fc9', width: 2 }, itemStyle: { color: '#5f9fc9' } },
       { name: '精力', type: 'line', data: items.map(i => i.energy_level), smooth: true,
-        symbol: 'circle', symbolSize: 4, lineStyle: { color: '#4ade80', width: 2 }, itemStyle: { color: '#4ade80' } },
+        symbol: 'circle', symbolSize: 4, lineStyle: { color: '#5fc987', width: 2 }, itemStyle: { color: '#5fc987' } },
       { name: '动力', type: 'line', data: items.map(i => i.motivation), smooth: true,
-        symbol: 'circle', symbolSize: 4, lineStyle: { color: '#c8f169', width: 2 }, itemStyle: { color: '#c8f169' } },
+        symbol: 'circle', symbolSize: 4, lineStyle: { color: '#3fd0a4', width: 2 }, itemStyle: { color: '#3fd0a4' } },
       { name: '酸痛', type: 'line', data: items.map(i => i.muscle_soreness), smooth: true,
-        symbol: 'circle', symbolSize: 4, lineStyle: { color: '#ff6b6b', width: 1.6, type: 'dashed' },
-        itemStyle: { color: '#ff6b6b' } },
+        symbol: 'circle', symbolSize: 4, lineStyle: { color: '#e05f5f', width: 1.6, type: 'dashed' },
+        itemStyle: { color: '#e05f5f' } },
     ],
   })
 }
