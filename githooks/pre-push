@@ -1,0 +1,6 @@
+#!/bin/sh
+# pre-push：扫描推送快照全树（比 commit 时多覆盖历史遗留改动）。
+if python -c "" 2>/dev/null; then
+  exec python tools/privacy_guard.py --tree
+fi
+exec py tools/privacy_guard.py --tree

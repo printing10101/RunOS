@@ -1,0 +1,21 @@
+name: privacy-guard
+
+# push/PR 后复扫推送快照全树。本地 pre-push 已扫一遍（githooks/），这层兜底
+# 防的是「从没配 core.hooksPath 的机器推送」——换机器克隆后忘跑
+# `git config core.hooksPath githooks` 时本地防线不存在，CI 是最后一道。
+on:
+  push:
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: 隐私扫描（推送快照全树）
+        run: python tools/privacy_guard.py --tree

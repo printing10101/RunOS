@@ -1,0 +1,33 @@
+# ruff.toml — Python 静态检查配置（仓库根，ruff 从被检查文件向上查找本文件）
+#
+# 为什么用 ruff.toml 而不是 pyproject.toml：
+#   pytest 的 rootdir 探测会把仓库根的 pyproject.toml 当作项目根标志，把 rootdir
+#   从 backend/ 顶到仓库根（连带影响 .pytest_cache 位置与用例 id 前缀）。本仓库只需要
+#   ruff 配置，用专用文件名可以完全避开这个耦合，也不必为一个 lint 配置引入
+#   pyproject.toml 的其它语义（构建后端、包元数据等）。
+#
+# 规则集选择原则：只开「能抓到真 bug 或真冗余」的组，不开纯风格组。
+#   E4/E7/E9  import 与语句结构错误       F   pyflakes（未定义名 / 未用导入）
+#   I         导入排序                    UP  pyupgrade（旧写法升级）
+#   B         flake8-bugbear（易错模式）
+# 刻意不启用的组见下方 ignore 的注释——是选择，不是遗漏。
+
+target-version = "py314"   # 与 backend/.venv（3.14.4）及 CI 一致
+line-length = 110          # 仅影响 formatter 建议；未启用 E501，行长不参与检查
+
+# 显式排除（.gitignore 已覆盖大部分，这里再兜一层，避免 CI 里装了依赖后误扫）
+extend-exclude = ["web", "desktop", "llama", "backend/.venv", "backend/_eval"]
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+
+ignore = [
+    # FastAPI 的依赖注入天然是「函数调用作默认值」：db: Session = Depends(get_db)。
+    # 这是框架要求的写法而非缺陷，全仓 90+ 处命中全是误报。
+    "B008",
+    # 以下两组是刻意不启用的，写在这里备查：
+    #   DTZ*   强制 datetime 带时区 —— 本应用是单用户本机应用，全程本地时间，
+    #          时间戳只在本地 SQLite 内比较，改造收益远低于成本。
+    #   BLE001 盲捕 Exception —— 项目有大量「外部同步/模型调用失败不致命」的降级路径，
+    #          均配 logger 记录后继续，属有意为之。
+]

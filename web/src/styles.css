@@ -1,0 +1,57 @@
+/* 全站设计令牌与基础样式（暗色主题）。变量清单与各视图引用保持同源：
+   新增变量先在这里登记，视图不得引用未定义的 var()。 */
+
+:root {
+  /* 页面与卡片 */
+  --bg-page: #0b0f14;
+  --bg-card: #10161f;
+  --bg-inset: #0d131b;
+  --border: #1d2735;
+
+  /* 文字层级 */
+  --text: #e8eef6;
+  --text-1: #e8eef6;
+  --text-2: #b7c3d2;
+  --text-3: #8291a5;
+
+  /* 品牌色 */
+  --lime: #c8f169;
+  --lime-deep: #9ec83f;
+  --cyan: #56d4e0;
+  --blue: #5b9dff;
+  --green: #4ade80;
+  --orange: #ffa24d;
+  --red: #ff6b6b;
+  --gold: #f5c26b;
+
+  /* 展示字体（数字/标题），回退到系统字体栈 */
+  --font-display: "Barlow Condensed", "Big Shoulders Display", "Segoe UI",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg-page);
+  color: var(--text);
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app { min-height: 100vh; }
+
+/* 数字展示统一用展示字体，等宽数字避免滚动跳动 */
+.num-display {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* 滚动条与暗色主题协调 */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #263244; border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Element Plus 弹层背景与暗色页面衔接 */
+.el-popper.is-dark { background: #1a2330; border-color: var(--border); }
+.el-card { --el-card-bg-color: var(--bg-card); }

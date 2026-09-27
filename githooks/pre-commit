@@ -1,0 +1,7 @@
+#!/bin/sh
+# pre-commit：扫描暂存内容里的隐私/凭据痕迹（AGENTS.md 强制闸门）。
+# 换机器克隆后必须重跑：git config core.hooksPath githooks
+if python -c "" 2>/dev/null; then
+  exec python tools/privacy_guard.py --staged
+fi
+exec py tools/privacy_guard.py --staged

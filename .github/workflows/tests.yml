@@ -1,0 +1,94 @@
+name: tests
+
+# 后端测试 + 前端构建闸门。此前 CI 只有 privacy-guard（隐私扫描），628 个测试完全依赖
+# 人工执行——改错一行没人拦。这里补上回归闸门。
+#
+# 两个必须知道的约束：
+#   1) 必须先构建前端。web/dist 是 gitignore 的产物，而 backend/app/main.py 的 SPA 回退
+#      路由是 `if WEB_DIST.exists()` 条件注册的——dist 不在场时该路由根本不注册，
+#      tests/test_security.py 里 7 个越界读取用例 + 1 个合法路由用例会一并失败
+#      （实测 8 failed）。顺带把前端构建本身也纳入验证，dist 与源码漂移同样会被发现。
+#   2) 跑 windows 而不是 ubuntu。本项目是 Windows-only 的本地应用（pywin32、
+#      llama-server.exe、Electron 壳、start.bat），Linux 不是交付目标，跑绿了也不代表能跑；
+#      且 test_security.py 的越界用例编码的是 Windows 路径语义（pathlib 在右操作数为
+#      绝对路径时会丢弃左侧，`/D:/...` 在 POSIX 下不是绝对路径，该用例会误判失败）。
+#
+# 测试不触发生命周期：全部用裸 TestClient(app)，没有 `with TestClient(...)`，
+# 所以 lifespan 不会执行，CI 里不会去拉 llama-server 或启动同步调度器。
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # ---- 前端构建（必须先于测试，见文件头约束 1）----
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: 安装前端依赖
+        working-directory: web
+        # 不加 --registry：package-lock.json 里 131 个包的 resolved 已指向 npmmirror，
+        # npm ci 直接按锁文件下载，额外指定源反而会与锁文件不一致。
+        run: npm ci
+
+      - name: 构建前端
+        working-directory: web
+        run: npm run build
+
+      # ---- 前端闸门（与后端 pytest 对等；vitest 用例和 eslint 配置都在库里）----
+      - name: 前端单元测试
+        working-directory: web
+        run: npm run test
+
+      - name: 前端静态检查
+        working-directory: web
+        run: npm run lint
+
+      # ---- 后端测试 ----
+      - uses: actions/setup-python@v5
+        with:
+          # 与开发机 backend/.venv 一致（3.14.4）。本地跑什么版本，CI 就验什么版本——
+          # 只在旧版本上跑绿，挡不住新版本才暴露的问题。若该版本暂不可用，
+          # 改成 "3.13" 即可（其余无需调整）。
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: 安装后端依赖
+        working-directory: backend
+        run: python -m pip install -r requirements.txt
+
+      - name: 运行后端测试
+        working-directory: backend
+        # 不带 --timeout：requirements.txt 未声明 pytest-timeout，带上会直接报
+        # "unrecognized arguments"。整套约 15 秒，无需超时保护。
+        run: python -m pytest tests/ -q
+
+  # 静态检查独立成一个 job：与 pytest 并行，且不必等前端 npm ci + build，
+  # 代码风格问题能在十几秒内先红，不用等完整的测试流水线。
+  # 跑 ubuntu 而非 windows：ruff 是纯静态检查，不碰 pywin32 / llama-server / Electron，
+  # 与平台无关，Linux runner 更快更省（pytest 必须跑 windows，见文件头约束 2）。
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: 安装开发依赖
+        run: python -m pip install -r backend/requirements-dev.txt
+
+      - name: 静态检查
+        # 必须在仓库根执行，ruff 靠向上查找发现 ruff.toml（规则集与忽略项都在那里）。
+        run: python -m ruff check .

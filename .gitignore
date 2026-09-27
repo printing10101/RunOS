@@ -1,0 +1,85 @@
+# ===== 凭据与环境（严禁提交）=====
+backend/.env
+.env
+*.env
+!.env.example
+
+# ===== 数据库（含个人训练/身体数据，严禁提交）=====
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ===== Node / 前端构建产物 =====
+node_modules/
+web/dist/
+# vite 在配置文件旁生成的临时 dep 快照（形如 vite.config.js.timestamp-1789717686279-*.mjs），
+# 每次 dev/build 都可能留下一个，属运行期产物
+web/vite.config.js.timestamp-*
+
+# ===== 日志与临时文件 =====
+*.log
+logs/
+*.tmp
+*_tmp.*
+repos_tmp.json
+# AI 评测产物（tools/ai_eval.py --save）：本机模型跑出的分数，换机器即失效，
+# 属环境相关数据，不入库。基线快照另存 backend/_eval/（同样在忽略范围内）。
+.ai_eval_*.json
+
+# ===== 临时调试脚本与抓包产物（严禁提交）=====
+# 排查高驰接口时产生的探针脚本与原始响应。_raw_records.txt 含真实 GPS 坐标
+# （起点经纬度）、活动 LabelId 与心率 —— 属于个人定位数据，绝不能进版本库。
+backend/_*
+backend/tools.json
+tools.json
+
+# ===== 工具缓存与本地工作目录 =====
+.mimosa/
+.workbuddy/
+.workbuddy-ai/
+.zcode/
+# 本地 llama.cpp 安装（含数百 MB CUDA 二进制，属本机环境不入库）
+llama/
+
+# ===== 过程性验证/体检报告（含本机路径与真实数据痕迹，不入库）=====
+docs/*验证*.html
+docs/*体检*.html
+
+# ===== 备份文件 =====
+*.bak-*
+
+# ===== GUI 测试截图（界面含个人训练数据，不入库）=====
+gui-test-screenshots/
+
+# ===== 恢复过程文档（内部事故记录，不入公开库，文件保留在本地）=====
+README_恢复说明.md
+_恢复报告*.md
+
+# ===== 桌面壳（构建产物不入库；源码与图标必须入库——旧壳就是因这条规则没放行而随目录丢失的）=====
+desktop/*
+!desktop/desktop.py
+!desktop/app.ico
+!desktop/create_shortcut.py
+!desktop/create_shortcut.ps1
+
+# ===== 系统 / 编辑器 =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ===== 项目本地备忘（本机运维笔记，不入公开库）=====
+AGENTS.md

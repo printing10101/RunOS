@@ -1,0 +1,11 @@
+# 开发 / CI 专用依赖（运行时不需要，部署时不必安装）。
+#
+#   pip install -r requirements-dev.txt
+#
+# 包含运行时依赖 + 下面这些工具。CI 见 .github/workflows/tests.yml 的 lint 与 pytest 两个 job。
+-r requirements.txt
+
+# 静态检查。规则集与忽略项固定在仓库根 ruff.toml（不是 ruff 的默认集，改之前先读那个文件）。
+# 之所以此前「装了 ruff 却结果不可复现」：venv 里有这个包、仓库里却没有配置，
+# 每次跑出来的是当时 ruff 版本的默认规则。现在配置入库，换机器/换版本结果一致。
+ruff>=0.16,<1.0

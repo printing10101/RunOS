@@ -1,0 +1,552 @@
+{
+  "meta": {
+    "file": "training_principles.json",
+    "scope": "训练原理（AI 定制计划的「为什么」层）",
+    "collected_at": "2026-09-11",
+    "disclaimer": "证据等级 A=RCT/系统综述/meta 分析，B=观察性研究或精英数据，C=一手实践/教练著作，D=二手转述。practical_rules 是给排课引擎与 AI 的可执行口径；platform_usage 标明本平台引擎已落地的位置。引用的具体研究（如 Gabbett 2016、Haugen 2022）多数经二手来源转述，未逐篇回读原文，已在 evidence_note 标注。"
+  },
+  "principles": [
+    {
+      "code": "progressive-overload",
+      "name_zh": "渐进超负荷与 10% 法则",
+      "name_en": "Progressive Overload & the 10% Rule",
+      "category": "load",
+      "summary": "适应来自「比上次略多」的刺激：跑量/强度必须渐进增加，且增量受控。10% 法则（每周跑量增幅不超过 10%）是最常用的安全口径；实际研究显示超过 30% 的周增幅显著推高伤病率。",
+      "mechanism": "组织（肌腱/骨骼/毛细血管）的重建速度慢于心肺适应。负荷渐进给组织留出重塑时间；负荷突变时，心肺能跟上而肌肉骨骼系统跟不上，伤病由此产生。",
+      "practical_rules": [
+        "每周跑量增幅 ≤10%（底线），35 岁以上或有伤病史按 5-8% 执行",
+        "每 4 周插入一个减量周（跑量 -20~30%），做超量恢复",
+        "中断 ≥2 周后，慢性负荷已下降，必须从更低水平重建，不能接着上次的量跑"
+      ],
+      "platform_usage": "planner.py 的 _weekly_km_path（渐进 + 每 4 周减量 0.8×）与 assess_feasibility 已实现该口径",
+      "evidence_level": "B",
+      "evidence_note": "10% 法则本身是经验共识（1976 年由 Dr. Joan Ullyot 推广），并无直接 RCT 验证「恰好 10%」；但 873 名新跑者一年追踪显示周增幅 >30% 者伤病率显著更高。引用数字来自二手转述。",
+      "sources": [
+        {"title": "The Ultimate Jogging Training Plan for Beginners（含 873 名新跑者追踪与 10% 法则源流）",
+         "url": "https://runningcardio.com/the-ultimate-jogging-training-plan-for-beginners/",
+         "source_type": "media", "year": null, "level": "C",
+         "note": "二手整理：26.2% 总伤病率 / 新手渐进训练 14.9% 等数字未回读原始 PMC 综述"},
+        {"title": "The Complete Runner's Guide（92 份亚精英马拉松计划分析：build 期周增 5%）",
+         "url": "https://upwellhealth.com.au/upwell-blog/complete-runners-guide-how-to-run-faster",
+         "source_type": "observational", "year": 2024, "level": "B",
+         "note": "对 92 份真实计划的分析：build 期平均周增约 5%，比 10% 更保守"}
+      ]
+    },
+    {
+      "code": "supercompensation",
+      "name_zh": "超量恢复（刺激—恢复—适应）",
+      "name_en": "Supercompensation (Stimulus–Recovery–Adaptation)",
+      "category": "recovery",
+      "summary": "训练是施加刺激，适应发生在恢复中：负荷后表现短暂下降，充分休息与补给后不仅回到基线还会略超基线。没有恢复的训练只是疲劳累积；连续负荷下适应被压缩，这正是减量周与减量期存在的理由。",
+      "mechanism": "训练分解组织并消耗糖原 → 恢复期修复并适度过量重建（线粒体增生、糖原超储、肌腱重塑）→ 下一周期可承受更大负荷。刺激过强或恢复不足都会打断该循环。",
+      "practical_rules": [
+        "质量课之间至少 48 小时（或插入纯轻松跑）",
+        "减量周 -20~30% 跑量并砍掉高强度课",
+        "恢复不足的信号：晨起静息心率持续升高、HRV 连续 2-3 天低于基线、睡眠质量下降 → 强制轻松日"
+      ],
+      "platform_usage": "训练状态面板（load_status.py）与晨间打卡建议（checkin_advice.py）已实现恢复监测；计划引擎的减量周即超量恢复周期",
+      "evidence_level": "B",
+      "evidence_note": "超量恢复是训练学基础模型，被广泛接受；「恢复周提升 40%」等具体数字来自二手科普（gearuptofit），不可作为精确效应量引用。",
+      "sources": [
+        {"title": "Supercompensation 词条（Marathon Handbook 跑者词典）",
+         "url": "https://marathonhandbook.com/running-terms/",
+         "source_type": "media", "year": null, "level": "C",
+         "note": "概念定义与训练-恢复平衡的标准表述"}
+      ]
+    },
+    {
+      "code": "acwr-load-management",
+      "name_zh": "急慢性负荷比（ACWR）与负荷管理",
+      "name_en": "Acute:Chronic Workload Ratio & Load Management",
+      "category": "load",
+      "summary": "伤病的主要驱动因素不是总跑量，而是负荷的突变：急性负荷（近 7 天）相对慢性负荷（近 28 天均值）的比值宜保持在 0.8-1.3；>1.5 显著推高伤病风险。持续较高的慢性负荷反而是保护性的（组织韧性）。",
+      "mechanism": "慢性负荷代表组织已适应的承载能力；急性负荷超过它即「超出现有韧性施加应力」。2025 年 22 项研究的 meta 分析确认 0.8-1.3 为最低风险区间。",
+      "practical_rules": [
+        "ACWR 控制在 0.8-1.3；>1.5 必须回调",
+        "每周增量相对 4 周滚动均值不超过 10-20%",
+        "休假归来从慢性负荷的 70-80% 重新起步"
+      ],
+      "platform_usage": "load_status.py 已实现 ACWR 计算并在训练状态面板/AI 工具 get_training_status 中输出；gear.py 已做「旧鞋+高 ACWR」联动",
+      "evidence_level": "A",
+      "evidence_note": "Gabbett 2016（BJSM）提出训练-伤病预防悖论框架；Li 等 2025（BMC Sports Sci Med Rehabil）meta 分析（22 研究）确认 0.8-1.3 区间。两者均经二手转述，未回读原文；且学界对 ACWR 的统计方法存在争议，应作为趋势监测工具而非精确预测器。",
+      "sources": [
+        {"title": "The 2025 Load Management Review（含 ACWR meta 与减量建议汇总）",
+         "url": "https://pheidi.training/articles/load-management-injury-2025",
+         "source_type": "meta", "year": 2025, "level": "A",
+         "note": "汇总 Gabbett 2016 / Li 2025 meta / Milewski 2014 睡眠研究；引用为二手转述"}
+      ]
+    },
+    {
+      "code": "intensity-distribution",
+      "name_zh": "强度分布：极化与金字塔",
+      "name_en": "Intensity Distribution (Polarized vs Pyramidal)",
+      "category": "intensity",
+      "summary": "成功耐力训练的强度分布呈双峰（极化 80/20）或金字塔（约 75/20/5）：大部分低强度 + 少量高强度，且成功者的共同点是刻意避免长期滞留中等强度「灰色地带」。2025 年证据认为两种分布总体相当，业余跑者金字塔可能略优。",
+      "mechanism": "低强度积累线粒体/毛细血管/脂肪氧化而不积累显著疲劳；高强度提供中枢与 VO2max 刺激；中等强度两头不靠——刺激不足而疲劳不减，是「练得很累却进步慢」的典型原因。",
+      "practical_rules": [
+        "轻松跑按心率 65-75%（能完整对话）执行，这是硬约束不是参考",
+        "每周质量课 1-3 次，两次之间至少 48 小时",
+        "用平台的强度分布报告对照：低强度占比 <70% 时优先砍中等强度垃圾跑量"
+      ],
+      "platform_usage": "zones.py 的 intensity_distribution 已在评估与 AI 工具中输出 80/20 对照；排课引擎的 E/T/I/R 分区即强度分布的执行层",
+      "evidence_level": "A",
+      "evidence_note": "Seiler & Tønnessen 2009（观察）；Stöggl & Sperlich 2014（9 周 RCT，极化组改善最大）；Haugen 2022（金字塔描述）。2025 meta 认为总体相当——均为二手转述，未回读原文。",
+      "sources": [
+        {"title": "The Norwegian Method Guide（含极化 vs 金字塔强度分布对比）",
+         "url": "https://www.trainingzones.io/en/guides/norwegian-method",
+         "source_type": "review", "year": null, "level": "B",
+         "note": "强度分布对比表与研究脉络"},
+        {"title": "The Science Behind the Norwegian Method（Seiler/Stöggl & Sperlich/Haugen 脉络）",
+         "url": "https://triworldhub.com/the-norwegian-method-of-endurance-training/",
+         "source_type": "review", "year": null, "level": "B",
+         "note": "含 Stöggl & Sperlich 2014 RCT 细节转述"}
+      ]
+    },
+    {
+      "code": "threshold-volume",
+      "name_zh": "阈值工作量驱动有氧适应",
+      "name_en": "Threshold Volume Drives Aerobic Adaptation",
+      "category": "intensity",
+      "summary": "在乳酸阈值（约血乳酸 2-3 mmol/L）附近累积大量可控工作量，是提升乳酸曲线右移最有效的手段之一。挪威体系把阈值工作量拆成多次短课（如每天两次 25 分钟），以频率换单次疲劳。",
+      "mechanism": "阈值强度最大化线粒体生物发生与乳酸穿梭能力（MCT 转运体），同时糖酵解参与度低、恢复成本可控；乳酸一旦失控，刺激性质就变了。",
+      "practical_rules": [
+        "无乳酸仪时用「能说短句」的 T 配速 + 心率上限（约 88-92% 最大心率）作为代理",
+        "单次阈值持续 20-40 分钟，或拆成巡航间歇（如 2000m×5）",
+        "某组后心率/体感明显爬升 → 下一组立即降速，宁少勿超"
+      ],
+      "platform_usage": "V 引擎的 T 区（83-88% VO2max）与巡航间歇课型已实现；vdot.daniels_paces 提供 T 配速",
+      "evidence_level": "B",
+      "evidence_note": "挪威体系的证据来自精英训练日志（观察性）与 Bakken 约 5500 次乳酸测量的实践总结；无直接对比 RCT。 Bakken 2026 书与 AMA 信息为二手转述。",
+      "sources": [
+        {"title": "Aerobic Base Building（含 Bakken 5500 次乳酸测量与挪威模型描述）",
+         "url": "https://rundida.com/guide/aerobic-base-building",
+         "source_type": "media", "year": null, "level": "C",
+         "note": "挪威模型与争议的平衡叙述"},
+        {"title": "[Triathlon Science] Arturo Casado PhD 访谈（挪威模型机制解读）",
+         "url": "https://scientifictriathlon.com/tts695/",
+         "source_type": "review", "year": null, "level": "B",
+         "note": "学者视角：以生理反应而非配速控制强度"}
+      ]
+    },
+    {
+      "code": "taper-science",
+      "name_zh": "减量期科学（Taper）",
+      "name_en": "Taper Science",
+      "category": "periodization",
+      "summary": "赛前减量：把训练量降到峰值的约 50-60%，保持频率与强度，主要缩短单次时长。meta 分析支持 41-60% 的量减幅产生最大成绩改善；减量期是表现峰值的一部分，不是「松懈」。",
+      "mechanism": "在保持神经肌肉刺激（频率与强度）的同时清偿累积疲劳、满储糖原。完全停练会丢失神经肌肉节奏；照常硬练则带着疲劳上场。",
+      "practical_rules": [
+        "减量 2-3 周，跑量线性或阶梯降到峰值的 50-60%",
+        "频率不减（照样每周 5-6 练），单次时长缩短",
+        "强度保留：短段落 + 比赛配速，不做新的高强度刺激",
+        "平台现有引擎 taper 相位按 0.65-0.75 缩量，偏保守，可按本原理下探到 0.5-0.6"
+      ],
+      "platform_usage": "planner.py 的 taper 相位（最后一周 ×0.65、倒数第二周 ×0.75）已实现；口径可在本原理指导下收紧",
+      "evidence_level": "A",
+      "evidence_note": "Bosquet 等 meta 分析（PLOS ONE，转述标注 2023，实际首发 2007，原文年份未核实）：量减 41-60%、保持频率与强度、单次时长减 41-60% 效果最佳。",
+      "sources": [
+        {"title": "The 2025 Load Management Review（taper 50-60% 建议）",
+         "url": "https://pheidi.training/articles/load-management-injury-2025",
+         "source_type": "meta", "year": 2025, "level": "A",
+         "note": "引用 Bosquet meta：41-60% 量减幅改善最大"}
+      ]
+    },
+    {
+      "code": "strength-for-runners",
+      "name_zh": "跑者力量训练",
+      "name_en": "Strength Training for Runners",
+      "category": "strength",
+      "summary": "每周 2-3 次力量训练（重点：单腿、后链、小腿/跟腱、髋外展与核心）可提升跑步经济性 4-8%、延长力竭时间（最高报告 +35%），并显著降低伤病发生率。力量训练全年维持，马拉松备赛期也不撤，只减量维持。",
+      "mechanism": "重负荷/爆发力训练提高神经募集与肌腱刚度 → 每步能量损耗降低（经济性）；髋/核心力量稳定骨盆 → 降低膝关节与髂胫束的代偿负荷。",
+      "practical_rules": [
+        "每周 2-3 次，每次 30 分钟最小有效剂量",
+        "动作优先级：单腿蹲/分腿蹲、罗马尼亚硬拉、提踵（渐进到负重单腿）、臀桥/臀推、髋外展（侧带走/Copenhagen）、核心抗旋转",
+        "安排在质量课同日的「课后」或轻松日，绝不在质量课前",
+        "重负荷少次数（3-4 组 × 6-12 次）优先于轻负荷多次数；赛季减为 1-2 次维持"
+      ],
+      "platform_usage": "planner.build_strength_session 已实现下肢+核心力量课（与质量课间隔 24h 的排课约束在生成逻辑中）",
+      "evidence_level": "A",
+      "evidence_note": "跑步经济性 +4-8% 来自多项系统综述（含 Blagrove 等）；Zanini 2025（MSSE）10 周最大力量+增强式训练延长力竭时间至 35%——均经二手转述。「伤病 -50%」的说法传播很广但效应量依赖具体研究设计，引用需谨慎。",
+      "sources": [
+        {"title": "How to Improve Your Running Performance（物理治疗师的循证指南，含力量/步频/营养）",
+         "url": "https://www.bodyfit.life/post/how-to-improve-your-running-performance-a-physiotherapist-s-evidence-based-guide",
+         "source_type": "review", "year": 2025, "level": "B",
+         "note": "含 2023 Sports Medicine 系统综述（经济性 +8%）与动作优先级清单"},
+        {"title": "The Complete Runner's Guide（含 Zanini 2025 MSSE 与 BJSM 2024 髋核心研究）",
+         "url": "https://upwellhealth.com.au/upwell-blog/complete-runners-guide-how-to-run-faster",
+         "source_type": "review", "year": 2025, "level": "B",
+         "note": "力竭时间 +35%、髋核心伤病 -39% 的原始研究转述"}
+      ]
+    },
+    {
+      "code": "fueling-carbs",
+      "name_zh": "长距离与比赛补糖策略",
+      "name_en": "Carbohydrate Fueling Strategy",
+      "category": "nutrition",
+      "summary": "糖原约支撑 90 分钟稳态跑步。超过 90 分钟的训练/比赛应从第 45 分钟开始补糖 30-60g/h（ISSN 立场）；胃肠的吸收与耐受能力本身可以也应该训练——在长距离课中按比赛策略演练补给。",
+      "mechanism": "外源碳水延迟糖原耗竭、维持血糖与中枢供能；肠道对高浓度碳水（尤其多重转运型：葡萄糖+果糖）的吸收率可经训练上调，不练则比赛日容易胃肠不适。",
+      "practical_rules": [
+        "预计 >90 分钟的课：从 45 分钟起每 30-45 分钟补 25-30g 碳水",
+        "比赛配速下的长距离课按比赛补给策略全程演练（含果胶品牌与饮水）",
+        "长距离前一天碳水 3-4g/kg；赛后 30 分钟内蛋白 20-30g + 碳水",
+        "高温高湿时增加电解质（钠），按出汗率校准"
+      ],
+      "platform_usage": "planner 长距离课的 diet_tip 已含碳水加载与途中补给提示；diet 模块做每日营养目标",
+      "evidence_level": "A",
+      "evidence_note": "30-60g/h 为 ISSN 立场（2023，二手转述）；伦敦马拉松 sub-3 群体实测平均 82g/h（theworkoutmag 转述官方赛后分析，未核实原始数据）说明进阶跑者实际远超下限。",
+      "sources": [
+        {"title": "Run Longer: 7 Science-Backed Training Tips（补糖时点与剂量）",
+         "url": "https://gearuptofit.com/?p=42687",
+         "source_type": "media", "year": 2025, "level": "C",
+         "note": "45 分钟起、30-60g/h 的通行口径"},
+        {"title": "2025 London Marathon Sub-3 Data（82g/h 实测）",
+         "url": "https://theworkoutmag.com/training/london-marathon-sub-three-training-decision-guide",
+         "source_type": "observational", "year": 2025, "level": "C",
+         "note": "sub-3 群体的实际补给强度，为二手转述"}
+      ]
+    },
+    {
+      "code": "sleep-recovery-monitoring",
+      "name_zh": "睡眠与恢复监测（HRV 引导）",
+      "name_en": "Sleep & Recovery Monitoring (HRV-guided)",
+      "category": "recovery",
+      "summary": "睡眠是最被低估的恢复手段：青少年运动员睡眠 <8h 者伤病风险约 1.7 倍；HRV 引导的训练在 endurance 运动员中比固定计划产生更好的适应。晨起 HRV 连续 2-3 天低于基线 → 当天减量而非硬顶。",
+      "mechanism": "深睡眠期生长激素分泌与组织修复、糖原回储；睡眠不足降低跑步经济性 3-5%（二手转述）并推高主观疲劳。HRV 反映自主神经恢复状态，是日间负荷决策的生理信号。",
+      "practical_rules": [
+        "目标睡眠 7-9 小时；晨训与睡眠冲突时优先睡眠",
+        "HRV 连续 2-3 天 <个人基线 → 安排轻松日/休息日",
+        "晨起静息心率比基线高 >5-7 次/分 → 视为恢复不足信号"
+      ],
+      "platform_usage": "body_metrics 已采集 HRV/静息心率/睡眠；evaluator.eval_recovery 与 get_recovery_status / get_daily_checkin 工具已实现该决策链",
+      "evidence_level": "B",
+      "evidence_note": "Milewski 2014（J Pediatr Orthop）为青少年队列；Kiviniemi 等 HRV 引导训练研究为二手转述（标注 2024，年份未核实原文）。「睡眠不足降低经济性 3-5%」来自二手科普，效应量仅供参考。",
+      "sources": [
+        {"title": "The 2025 Load Management Review（睡眠 <8h → 1.7× 伤病风险）",
+         "url": "https://pheidi.training/articles/load-management-injury-2025",
+         "source_type": "observational", "year": 2025, "level": "B",
+         "note": "引用 Milewski 2014；二手转述"}
+      ]
+    },
+    {
+      "code": "cadence-gait",
+      "name_zh": "步频优化与跨步矫正",
+      "name_en": "Cadence Optimization & Overstride Correction",
+      "category": "technique",
+      "summary": "步频提高 5-10% 可降低步幅与制动冲击（尤其膝关节负荷）；落地位置相对重心（而非先着地部位）是伤病风险的决定因素。12 个月的步频重训使新手伤病率下降 62%（二手转述）。大众跑者建议步频 ≥170spm。",
+      "mechanism": "更高步频缩短每步腾空与制动时间，落地更靠近重心正下方 → 冲击力峰值与 braking impulse 下降；同时降低单步垂直振幅。",
+      "practical_rules": [
+        "单次步频提升不超过 5%，每 2-4 周 +2-3spm",
+        "用节拍器/手表节拍在轻松课中练习，不在强度课改动作",
+        "小腿/跟腱不适立即回调——步频提高初期踝负荷上升"
+      ],
+      "platform_usage": "活动动态数据（avg_cadence）已入库；方法库的 ナンバ跑姿模板提供步频 drills",
+      "evidence_level": "A",
+      "evidence_note": "Heiderscheit 2011（步频 +5/10% 降低关节负荷）与 Moore 2016（步频与经济性）为经典研究（此处为二手转述）；「62% 伤病下降」来自 2025 Cureus 系统综述转述。",
+      "sources": [
+        {"title": "The Complete Runner's Guide（步频 +5-10% 的证据与 62% 数据）",
+         "url": "https://upwellhealth.com.au/upwell-blog/complete-runners-guide-how-to-run-faster",
+         "source_type": "review", "year": 2025, "level": "B",
+         "note": "含 Cureus 2025 系统综述（18 项研究）转述"}
+      ]
+    },
+    {
+      "code": "specificity-funnel",
+      "name_zh": "专项化漏斗（双向逼近比赛配速）",
+      "name_en": "Specificity Funnel (Approach Race Pace from Both Sides)",
+      "category": "specificity",
+      "summary": "周期越接近比赛，训练越专项化：强度从一般能力收窄到比赛配速，并从「略快于」和「略慢于」比赛配速两侧同时逼近。马拉松专项期的标志性课是带马配段落的长距离（如 25km @95% MP、30km @90% MP）。",
+      "mechanism": "比赛配速的专项适应（神经肌肉模式、燃料利用、心理节奏感）需要在该配速本身上积累里程；两侧逼近既能拉高上限（快侧）又能延长耐受（慢侧）。",
+      "practical_rules": [
+        "赛前 8-12 周引入马配专项课：8km @105% MP（心率应落在阈值区间，用于反推马配合理性）",
+        "长距离专项化：25km @95% MP → 30km @90% MP，每月 ≤1-2 次",
+        "专项课后必须安排减量周；心率异常爬升 = 目标马配定太激进"
+      ],
+      "platform_usage": "planner.build_quality_session 的 peak 相位（马配段落长距离）与 taper 激活课已实现",
+      "evidence_level": "C",
+      "evidence_note": "专项化是训练学共识（Lydiard→Canova 一脉相承），机制清晰但无独立 RCT；「两侧逼近」表述来自 Canova 体系的学者解读（Casado 访谈）。",
+      "sources": [
+        {"title": "[Triathlon Science] Canova 到 Kenyan 到 Norwegian（专项化漏斗）",
+         "url": "https://scientifictriathlon.com/tts695/",
+         "source_type": "review", "year": null, "level": "B",
+         "note": "专项块与双向逼近的系统解读"}
+      ]
+    },
+    {
+      "code": "consistency-and-return",
+      "name_zh": "一致性与中断后重建",
+      "name_en": "Consistency & Return-to-Training",
+      "category": "load",
+      "summary": "长期一致的适度负荷胜过间歇性的英雄周：错过一节课无关紧要，带伤硬练才会毁掉整个周期。中断后慢性负荷已下降，必须从更低水平重建——这是最常被违反、也最昂贵的原理。",
+      "mechanism": "慢性负荷（组织韧性）随停练衰减快于心肺感知——「感觉还在」而「组织已不在」，中断后恢复原跑量正是应力性骨折等伤病的经典起点。",
+      "practical_rules": [
+        "缺 1-2 课直接跳过并继续计划，不补偿堆量",
+        "中断 ≥2 周：从停练前周跑量的 60-70% 重启，每周 +10% 爬回",
+        "生病（发烧/全身症状）完全停练至症状消失后再缓 1-2 天"
+      ],
+      "platform_usage": "AI 工具（propose_easy_replacement / checkin_advice）已支持降档执行；ACWR 监测为中断后重建提供数据依据",
+      "evidence_level": "B",
+      "evidence_note": "负荷突变致伤的证据链与 ACWR 同源（Gabbett 框架）；「60-70% 重启」是从 ACWR 原理推导的操作口径，无独立 RCT。",
+      "sources": [
+        {"title": "The 2025 Load Management Review（负荷突变为首要致伤因素）",
+         "url": "https://pheidi.training/articles/load-management-injury-2025",
+         "source_type": "meta", "year": 2025, "level": "A",
+         "note": "突变负荷 > 总量的证据结论"}
+      ]
+    },
+    {
+      "code": "vo2max-intervals",
+      "name_zh": "VO2max 间歇训练",
+      "name_en": "VO2max Interval Training (Time at 90%+)",
+      "category": "intensity",
+      "summary": "VO2max 间歇的目标不是跑得多快，而是让摄氧量在 90% VO2max 以上累积足够时间。3-5 分钟的长间歇被证明最能最大化这一停留时间；组数与配速应以「最后几组仍能完成」为约束，而不是越快越好。",
+      "mechanism": "摄氧量升至 90% VO2max 需要约 60-90 秒（氧亏），段长过短则大部分时间花在爬升上；3-5 分钟段 + 2-3 分钟恢复使每段有 2-3 分钟的有效刺激时间，总刺激窗口最大。",
+      "practical_rules": [
+        "经典结构：1000m×6 @5K 配速（恢复 2 分）、1200m×5（2.5 分）、4×2000m @6-8K 努力（3 分）",
+        "每 1-2 周 1 次，仅在有有氧底子后引入，绝不连续两天安排",
+        "按「4 组能完整完成」定配速——最后一组崩掉说明配速定快了 5-10 秒"
+      ],
+      "platform_usage": "vdot.daniels_paces 的 I 区（95-100% VO2max）与 planner 强化期 1km 间歇课已实现",
+      "evidence_level": "A",
+      "evidence_note": "「3-5 分钟最大化 time@90%」有 2025 年研究（Frontiers in Sports and Active Living，二手转述）与经典 Billat vVO2max 研究线支撑；具体百分比数字为文献共识区间。",
+      "sources": [
+        {"title": "The Complete Runner's Guide（VO2max 间歇协议与 2025 研究转述）",
+         "url": "https://upwellhealth.com.au/upwell-blog/complete-runners-guide-how-to-run-faster",
+         "source_type": "review", "year": 2025, "level": "B",
+         "note": "长间歇优于短间歇的结论与经典协议"}
+      ]
+    },
+    {
+      "code": "running-economy",
+      "name_zh": "跑步经济性",
+      "name_en": "Running Economy (RE)",
+      "category": "technique",
+      "summary": "跑步经济性（同速度下的能耗）是长距离成绩三大支柱之一，且比 VO2max 更可训练：重负荷力量训练、增强式训练（2×/周 × 6-8 周）、步频优化都能显著改善经济性，且不增加体重。",
+      "mechanism": "肌腱刚度与弹性能回储提高 → 每步肌肉做功减少；神经募集更同步 → 协同肌浪费降低。经济性改善 4-8% 约等于全马成绩提升 2-3 分钟（按公式估算）。",
+      "practical_rules": [
+        "重负荷少次数力量（3-4 组 × 6-12 次，6 秒离心）优先于轻负荷多次数",
+        "增强式（跳箱/单腿跳/滑步跳）每周 2 次 × 6-8 周为一个周期，落地质量优先",
+        "步频 +5-10% 是最简单的经济性干预；与力量课并行效果最好"
+      ],
+      "platform_usage": "力量课模板（build_strength_session）与活动动态数据（步频/垂直振幅）已入库，可作为经济性变化的观察窗口",
+      "evidence_level": "A",
+      "evidence_note": "Zanini 2025（MSSE）10 周最大力量+增强式 → 力竭时间 +35%；2022 JSCR meta（增强式改善 3K/5K）；2023 Sports Medicine 系统综述（经济性 +8%）——均为二手转述。",
+      "sources": [
+        {"title": "How to Improve Your Running Performance（力量/增强式/步频的证据清单）",
+         "url": "https://www.bodyfit.life/post/how-to-improve-your-running-performance-a-physiotherapist-s-evidence-based-guide",
+         "source_type": "review", "year": 2025, "level": "B",
+         "note": "物理治疗师循证整理"},
+        {"title": "The Complete Runner's Guide（Zanini 2025 与经济性机制）",
+         "url": "https://upwellhealth.com.au/upwell-blog/complete-runners-guide-how-to-run-faster",
+         "source_type": "review", "year": 2025, "level": "B",
+         "note": "后链/小腿/核心的动作处方"}
+      ]
+    },
+    {
+      "code": "heat-acclimation",
+      "name_zh": "热适应训练（湿热环境跑者的必修课）",
+      "name_en": "Heat Acclimation",
+      "category": "heat",
+      "summary": "10-14 天主动热暴露（35-40℃ 环境下 60 分钟 50-65% VO2max 强度）使血浆容量扩张约 6-12%、核心体温降 0.2-0.5℃、出汗提前且钠浓度降低——这些收益**可迁移到凉爽环境**（心搏量↑、心率漂移↓）。湿热气候跑者的夏季训练与秋季比赛都受益。",
+      "mechanism": "热应激 → 醛固酮介导的钠潴留 → 血浆容量扩张 → 每搏量增加、任何环境下的次极限心率下降；出汗阈值提前改善散热。多数适应在首周出现，第 10-14 天基本完成，收益递减。",
+      "practical_rules": [
+        "剂量：连续 10-14 天、每天 60 分钟、35-40℃、轻松-中强度（热本身是刺激，不用跑快）",
+        "主动暴露（热环境中跑步）单位时间收益约为被动（桑拿/热水浴）的 2 倍；被动适合作为补充",
+        "暴露期间按渴感饮水并补钠——低钠饮食会拖慢血浆扩张；不刻意限盐",
+        "赛前列：热块结束距比赛 ≤10 天（适应维持 2-4 周）；减量期每周 2-3 次热课「封顶维持」到最后",
+        "所有常规热适应规则之外：心率漂移明显时以体感为准，35℃+ 中午时段直接停训"
+      ],
+      "platform_usage": "活动数据已记录气温（temp_c）与天气；本原理为夏季训练与秋季赛事的衔接提供排课依据（季节因子尚未引擎化，属待办）",
+      "evidence_level": "A",
+      "evidence_note": "热适应是少数有强 RCT 支持的耐力干预：Tyler meta（5km 计时 -5.3%）、Périard 2015（127 研究综述）、2026 Experimental Physiology Bayesian meta 回归（78 研究/1412 人，剂量-反应曲线量化）。具体百分比经二手转述，作为量级参考。",
+      "sources": [
+        {"title": "Heat Acclimation Science: 2026 Meta-Review（78 研究剂量-反应与 bookending 建议）",
+         "url": "https://runninglookout.com/news/heat-acclimation-science-runners-meta-review-2026",
+         "source_type": "meta", "year": 2026, "level": "A",
+         "note": "最完整的剂量-反应量化：首周完成大半、10-14 天封顶、主动约为被动的 2 倍"},
+        {"title": "Heat training for runners: protocol and performance gains",
+         "url": "https://keedia.com/running/heat-training-runners-protocol-performance-gains",
+         "source_type": "review", "year": null, "level": "B",
+         "note": "10-14 天协议参数与凉环境迁移证据"},
+        {"title": "Heat Acclimation Effects on Endurance Performance（Tyler meta、Périard 综述转述）",
+         "url": "https://research.poin-t-go.com/en/research/heat-acclimation-endurance-performance",
+         "source_type": "meta", "year": null, "level": "A",
+         "note": "协议参数表（时长/温度/湿度/强度）"}
+      ]
+    },
+    {
+      "code": "altitude-training",
+      "name_zh": "高原/低氧训练",
+      "name_en": "Altitude / Hypoxic Training",
+      "category": "heat",
+      "summary": "经典「高住低训（LHTL）」在部分精英中带来血红蛋白量增加与成绩改善，但个体响应差异极大（有响应者/无响应者），且对业余跑者的可及性与成本收益比都不理想。热适应是成本更低的近似替代。",
+      "mechanism": "低氧刺激 EPO 分泌 → 红细胞量增加 → 携氧能力提升；同时存在肺动脉压、去甲肾上腺素等非血液学效应。响应差异与铁储备、训练史、遗传相关。",
+      "practical_rules": [
+        "海拔 ≥2000m 住、低海拔训练是最优结构；纯高原训练会牺牲训练质量",
+        "块长 3-4 周；赛前 2 周内下山即可（适应维持数周）",
+        "先确认铁蛋白充足（建议 >35-50 ng/mL）再上高原，否则适应无从发生",
+        "业余跑者不建议专门投入；大迫杰式的低氧睡眠/高原营依赖团队保障"
+      ],
+      "platform_usage": "无引擎化；作为大迫杰/NOP 体系（osako-scientific）的背景原理",
+      "evidence_level": "B",
+      "evidence_note": "LHTL 效应在精英群体 meta 中约为 1-2% 成绩改善，但存在显著发表偏倚与个体差异；本库未抓取原始 meta，结论为二手共识。",
+      "sources": [
+        {"title": "Heat Acclimation vs Altitude 的对比叙述（Tyler meta：热适应效果≈3-4 周高原营）",
+         "url": "https://research.poin-t-go.com/en/research/heat-acclimation-endurance-performance",
+         "source_type": "meta", "year": null, "level": "B",
+         "note": "热适应与高原训练的成本收益对比"}
+      ]
+    },
+    {
+      "code": "periodization-models",
+      "name_zh": "周期化模型（线性/板块/波动）",
+      "name_en": "Periodization Models (Linear / Block / Undulating)",
+      "category": "periodization",
+      "summary": "把训练组织成「相位」是所有体系的共同骨架：线性周期（基础→强化→巅峰）、板块周期（集中突破单一能力块再切换）、波动周期（一周内高低强度交替）。对马拉松备赛，对 92 份真实计划的分析显示：build 期周增约 5%、taper 期周减 22-31%、比赛周约 -50%。",
+      "mechanism": "相位化让「刺激焦点」与「恢复焦点」交替出现，避免所有能力同时施压；板块模型利用了适应的延迟性（一个块的收益在块后 2-4 周显现）。",
+      "practical_rules": [
+        "标准马拉松相位：基础期（≥80% 低强度）→ 强化期（引入阈值/VO2max）→ 专项期（马配长距离）→ 减量期",
+        "短周期（<12 周）优先保专项与减量，压缩基础期",
+        "板块思路：连续 2-3 周集中同一能力（如阈值块），随后恢复周再切下一个块"
+      ],
+      "platform_usage": "planner.py 的 _alloc_phases（25%/40% 基础:强化:巅峰 + 15% 减量）即线性周期化实现",
+      "evidence_level": "B",
+      "evidence_note": "92 份亚精英计划的分析（PMC 2024，二手转述）给出真实世界的增量口径；三种模型孰优无 RCT 定论，均为结构性共识。",
+      "sources": [
+        {"title": "The Complete Runner's Guide（周期化四阶段与 92 计划分析）",
+         "url": "https://upwellhealth.com.au/upwell-blog/complete-runners-guide-how-to-run-faster",
+         "source_type": "observational", "year": 2024, "level": "B",
+         "note": "真实计划统计：build +5%/周、taper -22~31%/周、比赛周 -50%"}
+      ]
+    },
+    {
+      "code": "zone2-two-threshold",
+      "name_zh": "两阈分区模型（LT1/LT2 与 Zone 2）",
+      "name_en": "Two-Threshold Model (LT1/LT2, Zone 2)",
+      "category": "intensity",
+      "summary": "现代强度分区的生理基础是两个乳酸阈值：LT1（血乳酸约 2 mmol/L，从「轻松」变「持续」）与 LT2（约 4 mmol/L，乳酸开始净积累）。流行的「Zone 2 训练」即 LT1 以下区域——不是「慢跑」的模糊说法，而是有明确生理边界的区间。",
+      "mechanism": "LT1 以下：脂肪氧化为主、乳酸产生与清除平衡、可长期维持；LT1-LT2 之间：糖酵解参与渐增（灰色地带）；LT2 以上：乳酸净积累、力竭倒计时开始。分区训练的本质是把时间精确分配到这三个区域。",
+      "practical_rules": [
+        "LT1 的无仪器代理：能完整对话的心率上限（约 65-75% 最大心率）",
+        "LT2 的代理：能说短句但不能聊天（T 配速，约 88-92% 最大心率）",
+        "若能测血乳酸：LT1≈2 mmol/L、LT2≈4 mmol/L——个体差异大，勿直接套用固定心率数字",
+        "手表的默认 5 区间与生理阈值不对应，重要决策以体感+呼吸为准"
+      ],
+      "platform_usage": "zones.py 的心率五区间与 vdot 五配速区即本模型的工程实现；「两阈」口径可作为强度分布报告的解释层",
+      "evidence_level": "B",
+      "evidence_note": "两阈模型是运动生理学标准框架（Faucheux/Sjøgaard 一脉）；mmol 数值因个体与测试条件变异大（Faude 2009 报告阈值方法间 ±15 bpm 变异），固定数字只作锚点。",
+      "sources": [
+        {"title": "The Norwegian Method（三区乳酸模型与阈值定义）",
+         "url": "https://triworldhub.com/the-norwegian-method-of-endurance-training/",
+         "source_type": "review", "year": null, "level": "B",
+         "note": "LT1/LT2 与三区划分的标准表述"},
+        {"title": "Aerobic Base Building（MAF 与阈值的个体变异 ±15bpm）",
+         "url": "https://rundida.com/guide/aerobic-base-building",
+         "source_type": "media", "year": null, "level": "C",
+         "note": "阈值测定的个体差异，警示固定心率的误用"}
+      ]
+    },
+    {
+      "code": "energy-availability",
+      "name_zh": "能量可用性与日常营养（RED-S 风险）",
+      "name_en": "Energy Availability & RED-S Risk",
+      "category": "nutrition",
+      "summary": "训练进步的前提是「吃够」：能量可用性（摄入减运动消耗后每公斤瘦体重剩余热量）长期低于约 30 kcal/kg 会进入 RED-S（运动相对能量不足）——表现为成绩停滞、频繁伤病、静息心率异常、月经紊乱（女性）。蛋白质摄入 1.6-2.2 g/kg/日支持组织修复。",
+      "mechanism": "能量不足时身体下调「非生存」开支：骨重建、免疫、生殖与蛋白合成被抑制——伤病与停滞先于体重下降出现。跑者最常见的隐性形式是「训练加量但没加饭」。",
+      "practical_rules": [
+        "加量周期同步加饭：周跑量每 +10km 约需额外 700-1000 kcal/日",
+        "蛋白 1.6-2.2 g/kg/日，分 4-5 次摄入（每餐 0.3-0.4 g/kg）",
+        "长距离课后 30 分钟内：蛋白 20-30g + 碳水 1-1.2 g/kg",
+        "警示信号（成绩停滞+伤病频发+静息心率异常+女性月经紊乱）出现时优先加饭减量，而不是加练",
+        "铁蛋白与维生素 D 建议定期体检；女性跑者月经紊乱是必须就医的红色信号"
+      ],
+      "platform_usage": "diet 模块的每日营养目标与达成度分析已实现；本原理为「加量期饮食目标」提供依据",
+      "evidence_level": "B",
+      "evidence_note": "30 kcal/kg 瘦体重阈值与 RED-S 框架来自 IOC 共识声明（2018，此处为二手转述）；蛋白 1.6-2.2 g/kg 为 ISSN 立场（bodyfit 转述）。",
+      "sources": [
+        {"title": "How to Improve Your Running Performance（蛋白 1.6-2.2g/kg 与补剂建议）",
+         "url": "https://www.bodyfit.life/post/how-to-improve-your-running-performance-a-physiotherapist-s-evidence-based-guide",
+         "source_type": "review", "year": 2025, "level": "B",
+         "note": "ISSN 2023 立场的转述"}
+      ]
+    },
+    {
+      "code": "pacing-strategy",
+      "name_zh": "配速策略（负分配的能量学）",
+      "name_en": "Pacing Strategy (Negative Split)",
+      "category": "specificity",
+      "summary": "对多数跑者，前半程略慢于均速、后半程略快的负分配在能量学上最优：起点过快会提前透支糖原并显著放大后程掉速。2025 伦敦马拉松 sub-3 群体中 68% 实施了负分配。大迫杰 2025 瓦伦西亚（2:04:55）亦采用负分配执行。",
+      "mechanism": "糖原耗竭与快肌纤维募集随强度非线性变化：前半程每快 1%，后半程的代价大于 1%（疲劳叠加+快肌依赖）；均速或轻微负分配使糖原耗竭曲线与距离曲线匹配。",
+      "practical_rules": [
+        "马拉松实践：前半程比目标均速慢 5-15 秒/km，20 英里（32km）后再评估提速",
+        "训练中用中段提速课（末段马配长距离）演练后程加速能力",
+        "比赛日按心率/体感而非手表数字执行——高温高湿下按体感降档，宁慢 10 秒起步"
+      ],
+      "platform_usage": "planner 的长距离末段马配课已实现后程加速能力训练；race 模块记录实测成绩供复盘",
+      "evidence_level": "B",
+      "evidence_note": "负分配的能量学论证为模拟研究共识；68% sub-3 负分配来自 2025 伦敦官方赛后分析（二手转述，未核实原始数据）。",
+      "sources": [
+        {"title": "2025 London Marathon Sub-3 Decision Guide（68% 负分配、82g/h 补给）",
+         "url": "https://theworkoutmag.com/training/london-marathon-sub-three-training-decision-guide",
+         "source_type": "observational", "year": 2025, "level": "C",
+         "note": "sub-3 群体配速与补给实证（二手）"},
+        {"title": "大迫杰三破日本纪录的背后（瓦伦西亚负分配执行实录）",
+         "url": "https://news.qq.com/rain/a/20251217A070LV00",
+         "source_type": "media", "year": 2025, "level": "C",
+         "note": "精英负分配案例"}
+      ]
+    },
+    {
+      "code": "psychology-effort",
+      "name_zh": "努力感知与痛苦耐受",
+      "name_en": "Perceived Effort & Pain Tolerance (Psychological)",
+      "category": "psychology",
+      "summary": "力竭由大脑的「努力感知」决定（Marcora 心理资源模型）：感知努力达到上限即减速，而该上限可被动机、自我对话与痛苦耐受训练推高。反复暴露于困难训练状态确实能提升痛苦耐受阈值。日本驿传文化的「忍耐（gaman）」是该机制的极端应用——但双刃剑，需用制度保护，不能靠硬扛。",
+      "mechanism": "感知努力是大脑对「剩余潜能 vs 持续努力成本」的持续计算；团队责任、目标承诺等「潜在动机」可上移力竭点。重复暴露降低对痛苦灾难化的解读并提升自我效能。",
+      "practical_rules": [
+        "把「专项期最难的课」当作痛苦耐受训练本身，配速按计划而不是按当天感觉——但以完成度而非距离论英雄",
+        "自我对话脚本（如「放松-推-稳住」节奏口诀）在长距离课中演练，比赛日直接调用",
+        "硬上限：疼痛（区别于酸痛）立即停；带伤硬扛不是心理训练是损伤累积——日本驿传的带伤完赛案例是警示不是榜样"
+      ],
+      "platform_usage": "每日打卡（DailyCheckin）记录主观感受；大迫杰「马拉松 60% 体能 40% 意志」的表述即本原理的运动员版本",
+      "evidence_level": "B",
+      "evidence_note": "Marcora 模型有实验支持但机制仍有争议；驿传跑者痛苦耐受高于西方同水平跑者的说法来自二手科普（thesciencerunner），未核实原始对照研究。2023 JASP 的 mindfulness RCT 为二手转述。",
+      "sources": [
+        {"title": "How Japanese Corporate Runners Train Through Pain（Marcora 模型与 gaman 案例）",
+         "url": "https://thesciencerunner.com/japanese-corporate-runners-pain-tolerance",
+         "source_type": "media", "year": null, "level": "D",
+         "note": "心理机制科普与极限案例警示（Iida 带伤爬完 200m）"},
+        {"title": "The Complete Runner's Guide（mindfulness 2023 RCT 转述）",
+         "url": "https://upwellhealth.com.au/upwell-blog/complete-runners-guide-how-to-run-faster",
+         "source_type": "review", "year": 2025, "level": "B",
+         "note": "心理训练的循证条目"}
+      ]
+    },
+    {
+      "code": "long-run-physiology",
+      "name_zh": "长距离课生理学与安全上限",
+      "name_en": "Long Run Physiology & Safe Caps",
+      "category": "specificity",
+      "summary": "长距离课训练脂肪氧化、糖原节省化与肌肉耐力，是马拉松训练的核心课。但收益在约 2.5-3 小时后边际递减而恢复成本陡增：主流口径是长跑占周跑量不超过 25-30%（或不超过周跑量的上限 30-32km），不同体系给出不同封顶（Daniels 2.5 小时/Hanson 26km/Pfitz 35-37km）。",
+      "mechanism": "长距离的主要收益（毛细血管/线粒体/脂肪酶活性/肌纤维耐力）在 90-150 分钟内大部分获得；之后肌肉微损伤与恢复需求非线性上升——超长课的本质是用更大的恢复债换少量额外刺激。",
+      "practical_rules": [
+        "长跑占周跑量 25-30%（峰值周允许至 33%），单次封顶 30-32km（精英除外）",
+        "配速比目标马配慢 30-90 秒/km；只有专项期长距离才带马配段落",
+        "补给演练课：>90 分钟按比赛策略补糖——肠胃能力是练出来的",
+        "超长课后安排 2-3 天轻松日或休息；连续周超长课会累积不可见疲劳"
+      ],
+      "platform_usage": "planner 的 long_share（0.28-0.30）与单次封顶（全马 32km）已实现本口径",
+      "evidence_level": "B",
+      "evidence_note": "「25-30% 占比」是多体系通行的教练共识（japanhandbook 转述），无单一 RCT；生理收益时程来自糖原动力学研究（转述）。各体系封顶差异（16-37km）本身就是证据不唯一的证明。",
+      "sources": [
+        {"title": "Running a Marathon in Japan（长跑 25-30% 口径与渐进规则）",
+         "url": "https://japanhandbook.com/?p=5059",
+         "source_type": "media", "year": null, "level": "C",
+         "note": "安全口径汇总"},
+        {"title": "26.2 Workout Comparison（三大体系长跑封顶对比：16/22/24 英里）",
+         "url": "https://theworkoutmag.com/training/marathon-26-2-workout-plan-comparison-guide",
+         "source_type": "media", "year": null, "level": "C",
+         "note": "封顶口径因体系而异的直接证据"}
+      ]
+    }
+  ]
+}
