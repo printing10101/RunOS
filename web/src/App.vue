@@ -49,17 +49,22 @@
       <router-view />
     </el-main>
   </el-container>
+
+  <FirstRunDialog v-model="showOnboarding" />
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from './api'
+import FirstRunDialog from './components/FirstRunDialog.vue'
 
+const ONBOARDING_SKIP_KEY = 'runos:onboarding:skipped'
 const route = useRoute()
 const athlete = ref(null)
 const runnerType = ref('')
 const vdot = ref('-')
+const showOnboarding = ref(false)
 const age = computed(() =>
   athlete.value ? new Date().getFullYear() - athlete.value.birth_year : '-')
 
@@ -70,6 +75,8 @@ async function loadAthlete() {
     runnerType.value = d.runner_type && d.runner_type.event !== 'unknown' ? d.runner_type.type_name : ''
     // 档案切换（如清除演示数据）后旧 VDOT 不残留，允许回落到 '-'
     vdot.value = d.current_vdot || '-'
+    // 首次使用且没跳过过引导：弹窗补齐高驰拿不到的身份信息（性别/出生年份/身高/体重）
+    if (!d.athlete && !localStorage.getItem(ONBOARDING_SKIP_KEY)) showOnboarding.value = true
   } catch { /* 未初始化时忽略 */ }
 }
 
