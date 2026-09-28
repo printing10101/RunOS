@@ -73,6 +73,10 @@ _MIGRATION_DDL = {
     # 计划来源标记 / 完成方式标记（09-21 后的库结构）
     ("training_plans", "source"): "ALTER TABLE training_plans ADD COLUMN source VARCHAR(16) DEFAULT 'ai'",
     ("plan_workouts", "completed_source"): "ALTER TABLE plan_workouts ADD COLUMN completed_source VARCHAR(16)",
+    # 单课分析（services/workout_analysis.py：处方 vs 实际执行的结构化对照）
+    ("plan_workouts", "analysis"): "ALTER TABLE plan_workouts ADD COLUMN analysis JSON",
+    # AI 会话滚动摘要（services/ai_coach._compress_and_trim：旧对话裁剪前先压缩成要点）
+    ("ai_conversations", "summary"): "ALTER TABLE ai_conversations ADD COLUMN summary TEXT",
 }
 
 

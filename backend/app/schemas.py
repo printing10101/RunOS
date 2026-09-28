@@ -5,6 +5,13 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .services.vdot import GOAL_RACE_TYPES
+
+# 比赛项目词汇单源在 services/vdot.py（RACE_DISTANCES），这里只做类型化包装；
+# 加新项目改那边即可，目标 / AI 建计划 / 比赛成绩三处入口同时生效。
+RaceType = Literal[*GOAL_RACE_TYPES]              # type: ignore[valid-type]
+RaceTypeOrOther = Literal[*GOAL_RACE_TYPES, "other"]  # type: ignore[valid-type]
+
 
 class ORMModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -47,7 +54,7 @@ class AthleteAutoIn(BaseModel):
 
 
 class GoalIn(BaseModel):
-    race_type: Literal["5k", "10k", "hm", "marathon"]
+    race_type: RaceType
     target_time_sec: int | None = None
     target_label: str = ""
     target_date: date | None = None
@@ -140,6 +147,12 @@ class AiConversationCreateIn(BaseModel):
     title: str = Field(default="新对话", max_length=64)
 
 
+class CoachNoteCreateIn(BaseModel):
+    """用户手动添加教练长期记忆（AI 对话内自动记录走 remember_user_note 工具）。"""
+    content: str = Field(min_length=2, max_length=200)
+    category: str = Field(default="other")
+
+
 class AiWorkoutCommentIn(BaseModel):
     """训练后 AI 点评：默认幂等（已有点评直接返回），force=True 重新生成覆盖。"""
     workout_id: int
@@ -147,7 +160,7 @@ class AiWorkoutCommentIn(BaseModel):
 
 
 class AiPlanConfirmIn(BaseModel):
-    race_type: Literal["5k", "10k", "hm", "marathon"]
+    race_type: RaceType
     target_time_sec: int | None = None
     target_date: date | None = None
     target_label: str = ""
@@ -240,7 +253,7 @@ class RaceResultIn(BaseModel):
     """比赛实测成绩录入：成绩预测校准闭环的「真值」。"""
     date: date
     race_name: str = ""
-    race_type: Literal["5k", "10k", "hm", "marathon", "other"] = "other"
+    race_type: RaceTypeOrOther = "other"
     distance_m: float
     time_sec: int
     avg_hr: int | None = None

@@ -382,8 +382,38 @@ class PlanWorkout(Base):
     # 训练后 AI 点评（services/coach_comment.py 生成；老库由 _MIGRATION_DDL 补列）
     coach_comment: Mapped[str] = mapped_column(Text, default="")
     coach_comment_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # 单课分析（services/workout_analysis.py：处方 vs 实际执行的结构化对照，
+    # 老库由 _MIGRATION_DDL 补列）；plan_drift 调课建议的直接数据源
+    analysis: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     week: Mapped[PlanWeek] = relationship(back_populates="workouts")
+
+
+class AiProposal(Base):
+    """待确认的训练调整提案（漂移引擎 / AI 对话共用的持久层）。
+
+    两段式护栏的「待办」半边：这里只挂卡片（kind + payload + 理由），
+    应用必须走 /api/ai/proposals/{id}/apply → _PROPOSAL_APPLIERS 用当前
+    库内状态重检后写入，引擎与 LLM 都无法绕过校验直接改课表。
+    dedup_key 是引擎建议的幂等键（如 easy_replacement:wo:42），
+    同一节课的同类建议只挂一张卡片。
+    """
+
+    __tablename__ = "ai_proposals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    athlete_id: Mapped[int] = mapped_column(ForeignKey("athletes.id"), index=True)
+    kind: Mapped[str] = mapped_column(String(32))          # 与 AiProposalApplyIn.kind 同词汇
+    payload: Mapped[dict] = mapped_column(JSON)            # apply 入参（AiProposalApplyIn 形状）
+    title: Mapped[str] = mapped_column(String(255))
+    reasons: Mapped[list] = mapped_column(JSON, default=list)
+    preview: Mapped[dict] = mapped_column(JSON, default=dict)   # check_* 的 proposal 展示体
+    severity: Mapped[str] = mapped_column(String(16), default="medium")  # high/medium/low
+    source: Mapped[str] = mapped_column(String(16), default="engine")    # engine / chat
+    dedup_key: Mapped[str] = mapped_column(String(128), default="")
+    status: Mapped[str] = mapped_column(String(16), default="pending")   # pending/applied/dismissed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class AiConversation(Base):
@@ -394,6 +424,9 @@ class AiConversation(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     athlete_id: Mapped[int] = mapped_column(ForeignKey("athletes.id"), index=True)
     title: Mapped[str] = mapped_column(String(64), default="新对话")
+    # 滚动摘要（services/ai_coach._compress_and_trim）：被裁掉的旧对话压缩成要点存在这里，
+    # 下一轮注入消息头部，长会话「截断即遗忘」变「截断前先记要点」
+    summary: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive,
                                                  onupdate=utcnow_naive)
@@ -401,6 +434,29 @@ class AiConversation(Base):
     messages: Mapped[list[AiMessage]] = relationship(
         back_populates="conversation", cascade="all, delete-orphan",
         order_by="AiMessage.id")
+
+
+class CoachNote(Base):
+    """AI 教练长期记忆：对话中沉淀的持久事实（伤病史/偏好/生活节奏/装备/动机）。
+
+    与档案字段分离：体重/静息心率这类结构化字段走 propose_profile_update，
+    这里存的是没有字段归属、但教练每一轮都该记得的信息。由 remember_user_note
+    工具在对话中写入并即时落库（教练自己的记忆，无执行风险，不走提案两段式），
+    每轮经 system_prompt 注入；用户可在 AI 教练页查看/删除。
+    """
+
+    __tablename__ = "coach_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    athlete_id: Mapped[int] = mapped_column(ForeignKey("athletes.id"), index=True)
+    content: Mapped[str] = mapped_column(String(200))
+    # injury 伤病 / life 生活节奏 / preference 偏好 / gear 装备 / motive 动机 / other 其他
+    category: Mapped[str] = mapped_column(String(16), default="other")
+    source: Mapped[str] = mapped_column(String(16), default="ai")  # ai 对话提取 / user 手动
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive,
+                                                 onupdate=utcnow_naive)
 
 
 class AiMessage(Base):
