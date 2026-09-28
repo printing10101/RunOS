@@ -14,7 +14,7 @@ from datetime import date
 
 from . import vdot
 
-TARGET_DISTANCES = ["800m", "1500m", "3k", "5k", "10k", "hm", "marathon"]
+TARGET_DISTANCES = list(vdot.RACE_DISTANCES)   # 词汇单源在 vdot，预测表随距离表自动扩展
 
 
 @dataclass

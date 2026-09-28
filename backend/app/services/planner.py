@@ -14,13 +14,20 @@ from datetime import date, timedelta
 
 from . import vdot
 
-RACE_KM = {"5k": 5.0, "10k": 10.0, "hm": 21.1, "marathon": 42.2}
+# 距离词汇单源在 vdot.RACE_DISTANCES，这里只换算成 km，避免两份字典漂移
+RACE_KM = {key: dist / 1000 for key, dist in vdot.RACE_DISTANCES.items()}
 
 # 各项目「高水平选手」的峰值周跑量参照（km）。这只是**起点**，
 # 实际峰值还会被本人当前跑量（start_km）与天赋响应速度共同约束：
 #   peak = min(参照值 × 天赋系数, start_km × 2.2)
 # 所以不同用户拿到的峰值不同，不存在「所有人都练到 75km」这种写法。
-RACE_PEAK_KM = {"5k": 45, "10k": 55, "hm": 65, "marathon": 75}
+RACE_PEAK_KM = {"800m": 30, "1k": 30, "1500m": 32, "3k": 40,
+                "5k": 45, "10k": 55, "hm": 65, "marathon": 75}
+
+# 长距离课的单次上限（km）：距离越短的项目越不需要超长距离课，
+# 中短距离封在 10-12km——长距离依然要练，但不再是专项核心
+LONG_RUN_CAP_KM = {"800m": 10, "1k": 10, "1500m": 10, "3k": 12,
+                   "5k": 14, "10k": 18, "hm": 22, "marathon": 32}
 
 # 峰值跑量相对起始跑量的安全上限（16-20 周内不该翻倍以上）
 PEAK_TO_START_CAP = 2.2
@@ -284,7 +291,9 @@ def assess_feasibility(
         })
     # 时间可行性：最长单次可用时长是否够长距离
     max_slot_min = max((s["duration_minutes"] for s in available_slots), default=0)
-    need_long_min = round(RACE_KM[race_type] * 0.75 * 6.8)       # 峰值长距离约 75% 比赛距离
+    # 短距离按「75% 比赛距离」算出的长距离时间小到失真（800m 只有 4 分钟），
+    # 但长距离课对中短距离选手同样不可少，兜低下限 40 分钟
+    need_long_min = max(round(RACE_KM[race_type] * 0.75 * 6.8), 40)
     feasibility["long_run_time"] = {
         "longest_available_slot_minutes": max_slot_min,
         "peak_long_run_needs_minutes": need_long_min,
@@ -365,7 +374,7 @@ def generate_plan(
         # 长距离占比
         long_share = 0.30 if race_type == "marathon" else 0.28
         long_km = round(min(week_km * long_share * (1.25 if phase == "peak" else 1.0),
-                            {"marathon": 32, "hm": 22, "10k": 18, "5k": 14}[race_type] if phase != "taper" else 16), 1)
+                            LONG_RUN_CAP_KM[race_type] if phase != "taper" else 16), 1)
         if long_km < 8:
             long_km = min(8.0, week_km * 0.35)
         # 基础期不安排质量课：本阶段目标是打有氧底子，此期插强度是过度训练最常见的成因。

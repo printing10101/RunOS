@@ -135,9 +135,8 @@ def add_goal(data: schemas.GoalIn, db: Session = Depends(get_db)):
         raise HTTPException(404, "请先完善个人档案")
     g = models.Goal(athlete_id=a.id, **data.model_dump())
     if not g.target_label:
-        names = {"5k": "5公里", "10k": "10公里", "hm": "半程马拉松", "marathon": "全程马拉松"}
-        from ..services.vdot import time_str
-        g.target_label = f"{names[g.race_type]}{' ' + time_str(g.target_time_sec) if g.target_time_sec else ''}"
+        from ..services.vdot import RACE_LABELS_FULL, time_str
+        g.target_label = f"{RACE_LABELS_FULL[g.race_type]}{' ' + time_str(g.target_time_sec) if g.target_time_sec else ''}"
     db.add(g)
     db.commit()
     return g

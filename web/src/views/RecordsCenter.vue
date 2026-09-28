@@ -53,7 +53,7 @@
             <el-form-item label="赛事名称"><el-input v-model="raceForm.race_name" placeholder="可空" /></el-form-item>
             <el-form-item label="项目">
               <el-select v-model="raceForm.race_type" style="width:100%">
-                <el-option v-for="rt in ['5k', '10k', 'hm', 'marathon', 'other']" :key="rt"
+                <el-option v-for="rt in ['800m', '1k', '1500m', '3k', '5k', '10k', 'hm', 'marathon', 'other']" :key="rt"
                            :label="raceTypeLabel(rt)" :value="rt" />
               </el-select>
             </el-form-item>
@@ -141,7 +141,8 @@ import { todayStr } from '../utils/common'
 
 const tab = ref('activities')
 
-const RACE_TYPES = { '5k': '5公里', '10k': '10公里', hm: '半马', marathon: '全马', other: '其他' }
+const RACE_TYPES = { '800m': '800米', '1k': '1公里', '1500m': '1500米', '3k': '3公里',
+                    '5k': '5公里', '10k': '10公里', hm: '半马', marathon: '全马', other: '其他' }
 const raceTypeLabel = (t) => RACE_TYPES[t] || t
 
 // 偏差复盘：正值 = 比预测慢。±2% 内视为模型精准

@@ -70,7 +70,8 @@
                 <span v-else-if="g.status === 'paused'" class="goal-badge paused">已搁置</span>
               </div>
               <div class="goal-meta">
-                {{ { '5k': '5公里', '10k': '10公里', hm: '半马', marathon: '全马' }[g.race_type] }}
+                {{ { '800m': '800米', '1k': '1公里', '1500m': '1500米', '3k': '3公里',
+                     '5k': '5公里', '10k': '10公里', hm: '半马', marathon: '全马' }[g.race_type] }}
                 <template v-if="g.target_time_sec"> · 目标 {{ fmtTime(g.target_time_sec) }}</template>
                 <template v-if="g.target_date"> · {{ g.target_date }}</template>
                 <template v-if="g.progress == null && g.status === 'active'"> · 暂无预测，先攒数据</template>
@@ -89,6 +90,10 @@
           <el-form label-width="86px">
             <el-form-item label="项目">
               <el-select v-model="goalForm.race_type" style="width:100%">
+                <el-option value="800m" label="800 米" />
+                <el-option value="1k" label="1 公里" />
+                <el-option value="1500m" label="1500 米" />
+                <el-option value="3k" label="3 公里" />
                 <el-option value="5k" label="5 公里" />
                 <el-option value="10k" label="10 公里" />
                 <el-option value="hm" label="半程马拉松" />
@@ -96,7 +101,10 @@
               </el-select>
             </el-form-item>
             <el-form-item label="目标成绩">
-              <el-input v-model="goalForm.time_text" placeholder="如 3:30:00 / 22:30，可不填" />
+              <el-input v-model="goalForm.time_text" placeholder="如 3:30:00 / 22:30 / 3小时30分 / 1分50秒，可不填" />
+              <div v-if="timePreview" class="field-tip" style="margin-top:6px" :style="timePreviewOk ? '' : 'color:#e0805f'">
+                {{ timePreview }}
+              </div>
             </el-form-item>
             <el-form-item label="比赛日期">
               <el-date-picker v-model="goalForm.target_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
@@ -214,18 +222,68 @@ async function toggleAuto(key, auto) {
   } catch (e) { ElMessage.error(e.message || '切换失败') }
 }
 
+// 解析用户输入的目标成绩（秒）。返回整数秒；无法识别返回 NaN；空串返回 null。
+// 支持格式（此前只认 冒号:数字 一种写法，"1分50秒""330""4:30 当小时"这类输入
+// 会被按错误单位静默存错——现在配合下方实时预览，存什么一目了然）：
+//   3:30:00 / 22:30        冒号式（时:分:秒 或 分:秒）
+//   3小时30分 / 1分50秒 / 45分钟   中文单位
+//   330（全马/半马下）      三位紧凑式 = 3小时30分（与 AI 对话同一口径）
+//   45（纯数字）           按分钟
 function parseTimeSec(text) {
   const t = (text || '').trim()
   if (!t) return null
-  const parts = t.split(':').map(x => parseInt(x, 10))
-  if (parts.some(isNaN) || !parts.length) { ElMessage.error('成绩格式：分:秒 或 时:分:秒'); return null }
-  return parts.reduce((acc, v) => acc * 60 + v, 0)
+  if (t.includes(':')) {
+    const parts = t.split(':').map(x => parseInt(x, 10))
+    if (parts.some(isNaN) || parts.length < 2) return NaN
+    return parts.reduce((acc, v) => acc * 60 + v, 0)
+  }
+  const h = t.match(/(\d+)\s*小时/)
+  const m = t.match(/(\d+)\s*分/)
+  const s = t.match(/(\d+)\s*[秒S]/)
+  if (h || m || s) {
+    return (h ? +h[1] * 3600 : 0) + (m ? +m[1] * 60 : 0) + (s ? +s[1] : 0)
+  }
+  if (!/^\d+$/.test(t)) return NaN
+  const num = parseInt(t, 10)
+  // 三位数字 + 全马/半马：按 h:mm 紧凑式（330 = 3小时30分，与 AI 对话口径一致）
+  if ((goalForm.race_type === 'marathon' || goalForm.race_type === 'hm') && /^\d{3}$/.test(t)) {
+    return Math.floor(num / 100) * 3600 + (num % 100) * 60
+  }
+  return num * 60   // 其余纯数字按分钟
+}
+
+// 实时预览「这次输入会被存成什么」：解析错误时给出格式提示而不是等保存后才发现
+const timePreview = computed(() => {
+  const t = (goalForm.time_text || '').trim()
+  if (!t) return ''
+  const sec = parseTimeSec(t)
+  if (sec === null) return ''
+  if (Number.isNaN(sec)) return '无法识别这个写法，试试 3:30:00 / 22:30 / 3小时30分 / 1分50秒'
+  return `识别为：${fmtDuration(sec)}（共 ${sec} 秒），将按此保存`
+})
+const timePreviewOk = computed(() => {
+  const sec = parseTimeSec(goalForm.time_text)
+  return sec !== null && !Number.isNaN(sec)
+})
+
+function fmtDuration(sec) {
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s = sec % 60
+  const parts = []
+  if (h) parts.push(`${h}小时`)
+  if (m) parts.push(`${m}分`)
+  if (s || !parts.length) parts.push(`${s}秒`)
+  return parts.join('')
 }
 
 const savingGoal = ref(false)
 async function addGoal() {
   const target_time_sec = parseTimeSec(goalForm.time_text)
-  if (goalForm.time_text && target_time_sec === null) return
+  if (goalForm.time_text && (target_time_sec === null || Number.isNaN(target_time_sec))) {
+    ElMessage.error('目标成绩无法识别，支持 3:30:00 / 22:30 / 3小时30分 / 1分50秒 等写法')
+    return
+  }
   if (savingGoal.value) return
   savingGoal.value = true
   try {

@@ -99,7 +99,7 @@ const ceilingChart = ref(null)
 const loading = ref(true)
 const charts = createChartManager()
 
-const LABELS = { '800m': '800米', '1500m': '1500米', '3k': '3公里', '5k': '5公里', '10k': '10公里', hm: '半马', marathon: '全马' }
+const LABELS = { '800m': '800米', '1k': '1公里', '1500m': '1500米', '3k': '3公里', '5k': '5公里', '10k': '10公里', hm: '半马', marathon: '全马' }
 
 const predRows = computed(() => {
   const preds = a.value.predictions || {}

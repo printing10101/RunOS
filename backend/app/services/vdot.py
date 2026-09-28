@@ -15,6 +15,7 @@ import math
 # 标准比赛距离（米）。key 同时用作 Goal.race_type / 计划 race_type 的词汇
 RACE_DISTANCES = {
     "800m": 800,
+    "1k": 1000,
     "1500m": 1500,
     "3k": 3000,
     "5k": 5000,
@@ -23,11 +24,18 @@ RACE_DISTANCES = {
     "marathon": 42195,
 }
 
-_RACE_LABELS = {"800m": "800米", "1500m": "1500米", "3k": "3公里", "5k": "5公里",
-                "10k": "10公里", "hm": "半马", "marathon": "全马"}
+_RACE_LABELS = {"800m": "800米", "1k": "1公里", "1500m": "1500米", "3k": "3公里",
+                "5k": "5公里", "10k": "10公里", "hm": "半马", "marathon": "全马"}
 
 # 公开别名：报表/短板分析等需要中文距离名的地方统一用这份
 RACE_LABELS = _RACE_LABELS
+
+# 目标标签 / AI 文案用的全称（「半马破三」场景才说「半程马拉松」）
+RACE_LABELS_FULL = {"800m": "800米", "1k": "1000米", "1500m": "1500米", "3k": "3公里",
+                    "5k": "5公里", "10k": "10公里", "hm": "半程马拉松", "marathon": "全程马拉松"}
+
+# 允许设为比赛目标的项目（预测/规划/目标校验共用这一份，新增项目只改 RACE_DISTANCES）
+GOAL_RACE_TYPES = tuple(RACE_DISTANCES)
 
 
 def _vo2(velocity_m_per_min: float) -> float:
