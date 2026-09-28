@@ -39,7 +39,7 @@ def test_roundtrip_vdot_time_vdot(distance_m, vdot_value):
 def test_equivalent_times_monotonic_increasing():
     """距离越长，等效成绩时间越长。"""
     eq = vdot.equivalent_times(50)
-    order = ["800m", "1500m", "3k", "5k", "10k", "hm", "marathon"]
+    order = ["800m", "1k", "1500m", "3k", "5k", "10k", "hm", "marathon"]
     times = [eq[k] for k in order]
     assert times == sorted(times)
 
