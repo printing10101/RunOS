@@ -25,6 +25,14 @@
       <el-col :span="4"><div class="rs-num num-display"><RollNum :value="recap.recovery?.recovery_h" fallback="0" /><span class="rs-unit">h</span></div><div class="rs-label">恢复剩余</div></el-col>
     </el-row>
     <div class="recap-status" v-if="recap.recovery">{{ recap.recovery.status }} · {{ recap.recovery.status_detail }}</div>
+    <div class="recap-engine" v-if="engineDecisions">
+      <b>引擎决策</b>
+      <template v-if="engineDecisions.applied">
+        本周采纳了 {{ engineDecisions.applied }} 条调整建议<template v-if="engineDecisions.applied_titles?.length">：{{ engineDecisions.applied_titles.join('；') }}</template>
+      </template>
+      <template v-else>本周没有采纳的调整建议</template>
+      <template v-if="engineDecisions.withdrawn">（{{ engineDecisions.withdrawn }} 条因条件消失自动撤回）</template>
+    </div>
     <div class="recap-next" v-if="recap.next">
       <b class="recap-next-title">下周 · 第 {{ recap.next.week_index }} 周 · {{ phaseName(recap.next.phase) }} <span class="recap-target">目标 {{ recap.next.target_km }} km</span></b>
       <div class="recap-wos" v-if="recap.next.titles?.length">
@@ -52,6 +60,11 @@ const { review: recapReview, reviewSource: recapReviewSource,
 const weekPhaseName = computed(() => phaseName(recap.value.next?.phase) || '未安排')
 // ACWR 配色统一走 utils/acwrColor（阈值是训练学安全线，勿在视图里内联）
 const acwrTone = computed(() => acwrColor(recap.value.load?.acwr, 'var(--text-3)'))
+// 漂移引擎的本周决策摘要（applied/dismissed/withdrawn）
+const engineDecisions = computed(() => {
+  const e = recap.value.engine
+  return (e && (e.applied || e.dismissed || e.withdrawn)) ? e : null
+})
 
 function loadRecap() {
   api.get('/dashboard/recap-weekly').then(r => {
@@ -76,6 +89,8 @@ defineExpose({ loadRecap })
 .rs-label { font-size: 11px; color: var(--text-3); margin-top: 2px; letter-spacing: .04em; }
 .recap-status { font-size: 12px; color: var(--text-3); margin-top: 14px; line-height: 1.6; }
 .recap-next { margin-top: 8px; border-top: 1px dashed rgba(157,184,173,.14); padding-top: 12px; }
+.recap-engine { margin-top: 8px; font-size: 13px; color: var(--text-2); line-height: 1.7; }
+.recap-engine b { color: var(--text-1); margin-right: 6px; }
 .recap-next-title { font-size: 13.5px; }
 .recap-target { font-weight: 400; color: var(--text-3); margin-left: 6px; }
 .recap-wos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }

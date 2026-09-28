@@ -85,8 +85,20 @@ def build_weekly_recap(db) -> dict:
         "recovery": {"readiness": st["readiness"].get("score"), "recovery_h": st["recovery_time_h"],
                      "status": st["status"]["label"], "status_detail": st["status"]["detail"]},
         "next": next_week,
+        "engine": _engine_decision_summary(db, this_start),
         "lead": _lead_line(this, this_s, prev_s, st, next_week),
     }
+
+
+def _engine_decision_summary(db, week_start: date) -> dict:
+    """本周引擎决策摘要：漂移引擎建议的采纳/忽略情况（阶段 5.3 并入周复盘）。"""
+    from .proposal_store import week_decision_summary
+
+    try:
+        return week_decision_summary(db, week_start)
+    except Exception:
+        # 摘要失败不影响复盘主体（ai_proposals 表可能尚不存在于极老库）
+        return {"applied": 0, "dismissed": 0, "withdrawn": 0, "applied_titles": []}
 
 
 def _lead_line(this: list[dict], this_s: dict, prev_s: dict, st: dict, next_week: dict | None) -> str:

@@ -115,6 +115,42 @@
           <el-empty v-else description="今天没有安排训练，好好恢复" :image-size="70" />
         </el-card>
 
+        <!-- 训练调整建议：漂移引擎根据最新同步数据生成的待确认提案 -->
+        <el-card v-if="proposals.length || recentDecisions.length" shadow="never" style="margin-top:14px" class="proposal-card">
+          <template #header>
+            <div class="card-head">训练调整建议 <span class="card-sub">根据你最新同步的数据自动生成 · 采纳前不会改动课表</span></div>
+          </template>
+          <div v-for="p in proposals" :key="p.id" class="proposal-row">
+            <div class="proposal-main">
+              <div class="proposal-title-line">
+                <el-tag :type="severityType(p.severity)" size="small" effect="dark" style="font-weight:700">
+                  {{ severityLabel(p.severity) }}
+                </el-tag>
+                <b>{{ p.title }}</b>
+              </div>
+              <ul class="proposal-reasons">
+                <li v-for="(r, i) in p.reasons" :key="i">{{ r }}</li>
+              </ul>
+              <div v-if="previewSummary(p)" class="proposal-preview">{{ previewSummary(p) }}</div>
+            </div>
+            <div class="proposal-actions">
+              <el-button type="primary" size="small" round :loading="decidingId === p.id"
+                         @click="applyProposal(p)">采纳</el-button>
+              <el-button size="small" round plain :disabled="decidingId === p.id"
+                         @click="dismissProposal(p)">忽略</el-button>
+            </div>
+          </div>
+          <template v-if="recentDecisions.length">
+            <el-divider style="margin:10px 0" />
+            <div class="decision-head">最近调整</div>
+            <div v-for="h in recentDecisions" :key="h.id" class="decision-row">
+              <el-tag :type="decisionTagType(h.status)" size="small" effect="plain">{{ decisionLabel(h.status) }}</el-tag>
+              <span class="decision-title">{{ h.title }}</span>
+              <span class="decision-time">{{ fmtShortTime(h.decided_at) }}</span>
+            </div>
+          </template>
+        </el-card>
+
         <!-- 训练配速带 -->
         <el-card shadow="never" style="margin-top:14px">
           <template #header>
@@ -208,6 +244,11 @@ import { createChartManager } from '../composables/charts'
 
 const d = ref({})
 const kmChart = ref(null)
+// 漂移引擎的待确认调整建议（/api/ai/proposals/pending 拉取时服务端顺带重跑引擎）
+const proposals = ref([])
+const decidingId = ref(null)
+// 调整时间线：已决定（采纳/忽略/撤回）的建议
+const recentDecisions = ref([])
 // 打卡与周复盘拆成了子组件（CheckinCard / WeeklyRecap），自含状态，
 // 父组件只在首载和轮询时调它们的 load 方法
 const checkinCardRef = ref(null)
@@ -337,6 +378,60 @@ async function loadDashboard() {
   }
 }
 
+async function loadProposals() {
+  try {
+    proposals.value = (await api.get('/ai/proposals/pending')).proposals || []
+    recentDecisions.value = (await api.get('/ai/proposals/history')).history || []
+  } catch { /* 引擎不可用时不挡总览页 */ }
+}
+
+function decisionTagType(s) {
+  return { applied: 'success', dismissed: 'info', withdrawn: 'info' }[s] || 'info'
+}
+function decisionLabel(s) {
+  return { applied: '已采纳', dismissed: '已忽略', withdrawn: '已撤回' }[s] || s
+}
+function fmtShortTime(t) {
+  if (!t) return ''
+  const d = new Date(t)
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function severityType(s) {
+  return { high: 'danger', medium: 'warning', low: 'info' }[s] || 'info'
+}
+function severityLabel(s) {
+  return { high: '重点关注', medium: '建议调整', low: '可选' }[s] || s
+}
+function previewSummary(p) {
+  const v = p.preview || {}
+  return v.summary || v.steps_summary || v.new_steps_preview || ''
+}
+
+async function applyProposal(p) {
+  decidingId.value = p.id
+  try {
+    await api.post(`/ai/proposals/${p.id}/apply`)
+    ElMessage.success('已采纳，课表已更新')
+  } catch (e) {
+    ElMessage.warning(e.message || '采纳失败：课表状态可能已变化，建议已自动撤回')
+  } finally {
+    decidingId.value = null
+    loadProposals()
+    loadDashboard()
+  }
+}
+
+async function dismissProposal(p) {
+  decidingId.value = p.id
+  try {
+    await api.post(`/ai/proposals/${p.id}/dismiss`)
+  } catch { /* 已处理过时静默 */ } finally {
+    decidingId.value = null
+    proposals.value = proposals.value.filter(x => x.id !== p.id)
+  }
+}
+
 async function initDashboard() {
   await loadDashboard()
   if (loadError.value || d.value.empty) return   // 失败或空档案：无图表容器，不再初始化
@@ -346,6 +441,7 @@ async function initDashboard() {
   checkinCardRef.value?.loadCheckin()
   weeklyRecapRef.value?.loadRecap()
   loadFreshness()
+  loadProposals()
   renderKmChart()
   refreshTimer = setInterval(() => {
     if (document.visibilityState !== 'visible') return
@@ -357,6 +453,7 @@ async function initDashboard() {
     }).catch(() => {})
     weeklyRecapRef.value?.loadRecap()
     loadFreshness()
+    loadProposals()
   }, 120000)
 }
 
@@ -374,6 +471,17 @@ onUnmounted(() => {
 
 <style scoped>
 .today-head { display: flex; align-items: flex-end; justify-content: space-between; }
+.proposal-row { display: flex; align-items: flex-start; gap: 14px; padding: 10px 0; }
+.proposal-row + .proposal-row { border-top: 1px dashed rgba(255, 255, 255, 0.08); }
+.proposal-main { flex: 1; min-width: 0; }
+.proposal-title-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.proposal-reasons { margin: 6px 0 0; padding-left: 18px; color: var(--text-dim, #9ab0a7); font-size: 13px; line-height: 1.7; }
+.proposal-preview { margin-top: 6px; font-size: 13px; color: var(--jade, #3fd0a4); }
+.proposal-actions { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.decision-head { font-size: 13px; font-weight: 700; color: var(--text-dim, #9ab0a7); margin-bottom: 6px; }
+.decision-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+.decision-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.decision-time { color: var(--text-dim, #9ab0a7); font-size: 12px; }
 .head-chips .el-tag { margin-left: 8px; }
 .sync-stale { cursor: pointer; }
 .sync-stale:hover { border-color: rgba(217, 162, 78, 0.6); }
