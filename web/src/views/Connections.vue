@@ -24,8 +24,8 @@
               <el-option :value="365" label="近一年" />
             </el-select>
             <el-button size="small" type="primary" :loading="syncing === p.key" @click="sync(p.key)">同步数据</el-button>
-            <el-button v-if="p.key === 'coros'" size="small" type="success"
-                       :loading="syncingSchedule" @click="syncSchedule">同步课表</el-button>
+            <el-button v-if="p.key === 'coros'" size="small" plain
+                       :loading="syncingSchedule" @click="syncSchedule">仅同步课表</el-button>
             <el-button v-if="p.key === 'coros'" size="small" @click="showTools">可用数据接口</el-button>
             <el-button v-if="p.key === 'coros' && connOf(p.key)" size="small" type="success" plain
                        :loading="loadingFitness" @click="showFitness">官方体能评估</el-button>
@@ -77,7 +77,7 @@
         <el-card shadow="never">
           <template #header>同步说明</template>
           <ol class="sync-guide">
-            <li>高驰走<b>官方 MCP 通道</b>：点「连接高驰」→ 浏览器登录高驰账号并授权 → 回到本页点「同步数据」；</li>
+            <li>高驰走<b>官方 MCP 通道</b>：点「连接高驰」→ 浏览器登录高驰账号并授权 → 回到本页点「同步数据」，<b>一次完成</b>官方课表镜像 + 训练记录/身体数据拉取（「仅同步课表」只刷新课表、不拉记录）；</li>
             <li>可读取运动记录、分圈分段、心率/配速/海拔、睡眠与 HRV、静息心率、训练负荷、体能评估（VO2max / 阈值配速 / 赛事预测）；</li>
             <li>还可按需拉取 <b>FIT 原始文件</b>（含 GPS 轨迹与逐秒数据，官方限每账号每日 50 条）；</li>
             <li>无法走 API 时，可在「训练计划」页下载 <b>FIT 课表文件</b>，在高驰 App 内导入。</li>
@@ -264,19 +264,38 @@ async function connectOfficial(key) {
 
 async function sync(key) {
   syncing.value = key
+  let scheduleNote = ''
   try {
+    // 高驰：一次点按完成两件事——先镜像官方课表（秒级），再拉训练记录（分钟级）。
+    // 课表镜像失败只提示不阻断，训练记录才是这个按钮的主事。
+    if (key === 'coros') scheduleNote = await syncScheduleQuiet()
     // 近一年全量同步要分 6-7 段拉取 + 补详情，耗时可达数分钟，覆盖全局 30s 超时
     const r = await api.post(`/connections/${key}/sync`, { since_days: syncRange.value, detail_limit: 30 },
                              { timeout: 600000 })
     ElMessage.success(`同步完成：拉取 ${r.fetched} 条，新增 ${r.added} 条` +
-                      (r.body_days ? `，身体数据 ${r.body_days} 天` : ''))
+                      (r.body_days ? `，身体数据 ${r.body_days} 天` : '') +
+                      (scheduleNote ? `；${scheduleNote}` : ''))
     await load()
   } catch (e) {
     ElMessage.error(e.message || '同步失败')
   } finally { syncing.value = '' }
 }
 
-// 镜像高驰官方课表：首次同步会归档本平台自生成的课表，以高驰为课表事实源
+// 供「同步数据」捎带的课表镜像：有变动时返回一句摘要拼进完成提示，失败只警告
+async function syncScheduleQuiet() {
+  try {
+    const r = await api.post('/connections/coros/sync-schedule', {}, { timeout: 120000 })
+    if (!r.count || (!r.added && !r.updated && !r.removed && !r.archived_local)) return ''
+    return `课表新增 ${r.added}、更新 ${r.updated}` +
+           (r.removed ? `、移除 ${r.removed}` : '') +
+           (r.archived_local ? '；本地原课表已归档' : '')
+  } catch (e) {
+    ElMessage.warning(`高驰课表镜像失败（不影响训练记录）：${e.message || '未知错误'}`)
+    return ''
+  }
+}
+
+// 单独刷新课表用（高驰改了手表上的课表、又不想等一次全量数据同步时）
 const syncingSchedule = ref(false)
 
 async function syncSchedule() {
