@@ -1,6 +1,7 @@
 """训练计划：生成 / 查看 / 下发到高驰·佳明手表 / FIT 导出 / 完成打卡。"""
 from __future__ import annotations
 
+import logging
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -227,6 +228,16 @@ def complete_workout(workout_id: int, data: schemas.PlanWorkoutCompleteIn, db: S
     if data.completed:
         from ..services.coach_comment import regenerate_async
         regenerate_async(wo.id)
+        # 单课分析（处方 vs 实际）：纯计算，同步做掉；手动打卡无关联活动时
+        # 也会落一条 no_data 结论，调课引擎据此知道这节课没有执行数据
+        analysis = None
+        try:
+            from ..services.workout_analysis import analyze_and_store
+            analysis = analyze_and_store(db, wo.id)
+        except Exception as e:
+            logging.warning("单课分析失败（workout %s）: %s", wo.id, e)
+        return {"ok": True, "status": wo.status, "completed_activity_id": wo.completed_activity_id,
+                "analysis": analysis}
     return {"ok": True, "status": wo.status, "completed_activity_id": wo.completed_activity_id}
 
 
@@ -249,6 +260,9 @@ def _plan_dict(plan: models.TrainingPlan) -> dict:
                 "status": wo.status, "pushed_platforms": wo.pushed_platforms or [],
                 "coach_comment": wo.coach_comment or "",
                 "coach_comment_at": wo.coach_comment_at.isoformat() if wo.coach_comment_at else None,
+                "completed_activity_id": wo.completed_activity_id,
+                "completed_source": wo.completed_source,
+                "analysis": wo.analysis,
             } for wo in w.workouts],
         } for w in plan.weeks],
     }

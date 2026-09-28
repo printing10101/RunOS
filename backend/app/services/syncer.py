@@ -33,6 +33,12 @@ _lock = threading.Lock()
 _running = False
 _last_body_sync: datetime | None = None
 
+# 自适应跟轮：拉到新活动后的 FAST_ROUNDS 轮内把间隔压到 FAST_ROUND_MINUTES，
+# 详情富化/身体数据往往滞后一拍，跟得紧一点才能尽快闭环「跑完 → 分析完」
+FAST_ROUND_MINUTES = 10
+FAST_ROUNDS = 3
+_fast_rounds_left = 0
+
 
 class SyncBusy(RuntimeError):
     """上一次同步尚未结束。撞锁方直接跳过并提示，不排队。"""
@@ -94,9 +100,24 @@ def _schedule_locked(minutes: int | None) -> None:
         _timer = None
     if minutes is None:
         return
-    _timer = threading.Timer(minutes * 60, _run_once)
+    _timer = threading.Timer(effective_interval(minutes) * 60, _run_once)
     _timer.daemon = True
     _timer.start()
+
+
+def effective_interval(minutes: int) -> int:
+    """排下一轮时实际使用的间隔：跟轮期压短，平时按配置。"""
+    with _lock:
+        return min(minutes, FAST_ROUND_MINUTES) if _fast_rounds_left > 0 else minutes
+
+
+def _update_fast_rounds(added_any: bool) -> None:
+    """拉到新活动（用户刚练完）→ 进入跟轮期；空闲轮逐次退出。"""
+    global _fast_rounds_left
+    if added_any:
+        _fast_rounds_left = FAST_ROUNDS
+    elif _fast_rounds_left > 0:
+        _fast_rounds_left -= 1
 
 
 def start_scheduler() -> None:
@@ -133,7 +154,7 @@ def _body_due(now: datetime) -> bool:
 
 def _run_once() -> None:
     """执行一轮自动同步，然后按当前配置排下一轮。任何单平台失败不拖垮其他平台。"""
-    global _last_body_sync
+    global _last_body_sync, _fast_rounds_left
     from sqlalchemy import select
 
     from .. import models as m
@@ -163,6 +184,7 @@ def _run_once() -> None:
                 last_auto_result[row.platform] = result
             if include_body:
                 _last_body_sync = datetime.now()
+            _update_fast_rounds(any(r.get("added") for r in last_auto_result.values()))
         finally:
             db.close()
     except Exception:

@@ -84,6 +84,11 @@
                   ✓ {{ wo.pushed_platforms.map(p => ({ garmin: '佳明', coros: '高驰' }[p])).join('/') }}
                 </el-tag>
                 <div v-if="wo.status === 'completed'" class="wo-comment" @click.stop>
+                  <div v-if="analysisBadge(wo)" class="wc-analysis">
+                    <el-tag :type="{ on_target: 'success', too_fast: 'warning', too_slow: 'warning', short: 'danger', no_data: 'info' }[wo.analysis?.verdict] || 'info'"
+                            size="small" effect="plain">课况：{{ analysisBadge(wo) }}</el-tag>
+                    <span v-if="wo.analysis?.reasons?.length" class="wc-analysis-reason">{{ wo.analysis.reasons[0] }}</span>
+                  </div>
                   <div v-if="wo.coach_comment" class="wc-text" :title="wo.coach_comment">✦ {{ wo.coach_comment }}</div>
                   <div v-else-if="commentPending[wo.id]" class="wc-pending">✦ AI 点评生成中…</div>
                   <el-button v-else size="small" link type="primary" class="wc-btn"
@@ -145,7 +150,7 @@
 
       <template v-if="aiParsed">
         <el-divider />
-        <div class="ai-parse-row"><span>项目</span><b>{{ { '5k': '5 公里', '10k': '10 公里', hm: '半程马拉松', marathon: '马拉松' }[aiParsed.race_type] }}</b></div>
+        <div class="ai-parse-row"><span>项目</span><b>{{ { '800m': '800米', '1k': '1公里', '1500m': '1500米', '3k': '3公里', '5k': '5 公里', '10k': '10 公里', hm: '半程马拉松', marathon: '马拉松' }[aiParsed.race_type] }}</b></div>
         <div class="ai-parse-row"><span>标签</span><b>{{ aiParsed.target_label || '—' }}</b></div>
         <div class="ai-parse-row"><span>目标成绩</span><b>{{ targetStr }}</b></div>
         <div class="ai-parse-row"><span>比赛日期</span><b>{{ aiParsed.target_date || '未指定（默认 16 周）' }}</b></div>
@@ -338,11 +343,18 @@ function openSteps(wo) {
   showSteps.value = true
 }
 
+// ---- 单课分析（处方 vs 实际）的展示口径 ----
+const ANALYSIS_LABELS = { on_target: '达标', too_fast: '快于处方', too_slow: '慢于处方', short: '未跑完', no_data: '无实际数据' }
+function analysisBadge(wo) {
+  return wo.analysis ? (ANALYSIS_LABELS[wo.analysis.verdict] || wo.analysis.verdict) : ''
+}
+
 async function toggleDone(wo) {
   const done = wo.status !== 'completed'
   try {
-    await api.post(`/plan/workouts/${wo.id}/complete`, { completed: done })
+    const r = await api.post(`/plan/workouts/${wo.id}/complete`, { completed: done })
     wo.status = done ? 'completed' : 'planned'
+    if (r.analysis) wo.analysis = r.analysis
     ElMessage.success(done ? '已标记完成，AI 点评正在后台生成' : '已取消完成')
     if (done) scheduleCommentPoll(wo.id)
     else commentPending.value[wo.id] = false
@@ -431,6 +443,8 @@ onMounted(load)
 .wo-meta { font-size: 12px; color: var(--text-3); margin: 4px 0; font-family: var(--font-display); letter-spacing: .04em; }
 .wo-tip { font-size: 11px; color: var(--orange); background: rgba(217, 162, 78, 0.08); border-radius: 5px; padding: 2px 6px; margin-bottom: 7px; }
 .wo-comment { margin-top: 6px; }
+.wc-analysis { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: wrap; }
+.wc-analysis-reason { font-size: 11.5px; color: var(--text-3, #9ab0a7); }
 .wc-text {
   font-size: 11px; color: var(--text-2); line-height: 1.55;
   background: rgba(63, 208, 164, 0.06); border: 1px dashed rgba(63, 208, 164, 0.25);

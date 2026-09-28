@@ -393,6 +393,23 @@ def _filter_new_activities(db: Session, row: models.PlatformConnection, acts: li
                      and (a.sport, a.start_time.isoformat()) in existing_ks)]
 
 
+def _prioritize_recent(new_acts: list, recent_hours: int = 48) -> list:
+    """把最近的活动排到队首（不改变内容，只影响富化顺序）。
+
+    自动同步每轮只富化 detail_limit 条：平台返回顺序不保证最新在前，
+    不排序时「今天刚跑完的课」可能抢不到名额——而它恰恰是调课分析
+    （workout_analysis / plan_drift）最需要逐公里分段和心率细节的一条。
+    """
+    now = datetime.now()
+
+    def _rank(a: Any):
+        recent = bool(a.start_time) and (now - a.start_time) <= timedelta(hours=recent_hours)
+        ts = a.start_time.timestamp() if a.start_time else 0.0
+        return (0 if recent else 1, -ts)
+
+    return sorted(new_acts, key=_rank)
+
+
 def _enrich_new_activities(adapter: Any, new_acts: list, detail_limit: int) -> None:
     """为最近若干条新活动补拉详情（分段/轨迹/曲线），失败不阻断同步。"""
     fetch_detail = getattr(adapter, "fetch_detail", None)
@@ -586,6 +603,9 @@ def _execute_sync_locked(db: Session, row: models.PlatformConnection, *, since_d
         raise
 
     new_acts = _filter_new_activities(db, row, acts)
+    # 详情/圈数据富化配额每轮只有 detail_limit 个名额：排序保证最近 48h 的活动
+    # （刚跑完的课，调课分析最依赖它的分段/心率细节）优先拿到名额
+    new_acts = _prioritize_recent(new_acts)
     _enrich_new_activities(adapter, new_acts, detail_limit)
     backfilled = _backfill_activity_details(db, adapter, athlete,
                                             row.platform, detail_limit, backfill_detail)
@@ -593,9 +613,12 @@ def _execute_sync_locked(db: Session, row: models.PlatformConnection, *, since_d
                                               detail_limit, backfill_detail)
 
     added = 0
+    new_ids: list[int] = []
     for a in new_acts:
-        if _insert_activity(db, row, a):
+        obj = _insert_activity(db, row, a)
+        if obj is not None:
             added += 1
+            new_ids.append(obj.id)
 
     # 活动先落盘：身体数据阶段失败（授权失效等）不能回滚整批已拉取的活动
     _save_credentials(row, adapter)
@@ -607,6 +630,16 @@ def _execute_sync_locked(db: Session, row: models.PlatformConnection, *, since_d
     recovery_synced = _sync_recovery_status(db, row, adapter, include_body)
 
     db.commit()
+
+    # 同步后置钩子（活动↔课表对账 / 训练后点评 / 画像刷新）：必须在上面的活动
+    # commit 之后跑；失败只记日志，不影响同步结果本身
+    if new_ids:
+        try:
+            from ..services.activity_link import on_activities_changed
+            on_activities_changed(db, row.athlete_id, new_ids)
+        except Exception:
+            logger.exception("同步后置处理失败（不影响同步本身） athlete=%s", row.athlete_id)
+
     return {"ok": True, "fetched": len(acts), "added": added,
             "backfilled": backfilled, "laps_backfilled": laps_backfilled,
             "body_days": body_synced, "fitness_days": fitness_synced,
@@ -639,9 +672,9 @@ def _quarantine_bad_distance(a: Any) -> None:
         a.distance_m = 0
 
 
-def _insert_activity(db: Session, row: models.PlatformConnection, a: Any) -> bool:
+def _insert_activity(db: Session, row: models.PlatformConnection, a: Any) -> models.Activity | None:
     """单条活动入库；命中平台去重唯一索引（ux_activities_platform_external）时
-    返回 False 而不是让整批失败。
+    返回 None 而不是让整批失败。
 
     应用层 existing_ids 去重只能拦「同步开始前已在库」的活动；多开实例并发拉取时
     两边都可能通过应用层检查，DB 层唯一索引是最后一道闸。SAVEPOINT 保证只回滚
@@ -669,8 +702,8 @@ def _insert_activity(db: Session, row: models.PlatformConnection, a: Any) -> boo
             db.expunge(obj)
         logger.warning("活动命中唯一索引，按并发重复跳过 platform=%s external_id=%s",
                        row.platform, a.external_id)
-        return False
-    return True
+        return None
+    return obj
 
 
 def _snapshot_up_to_date(db: Session, athlete_id: int) -> bool:
