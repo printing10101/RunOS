@@ -48,11 +48,15 @@ class Settings(BaseSettings):
     # 也回退读取 LLAMA_API_KEY / LLM_API_KEY 环境变量。
     ai_api_key: str = ""
     ai_timeout: float = 120.0
-    # 配 0 会让每轮对话都撞"已达最大轮数"，最低 1
-    ai_max_tool_rounds: int = max(1, 6)
+    # 配 0 会让每轮对话都撞"已达最大轮数"，最低 1。
+    # 8K 时代是 6：窗口小、每轮工具结果都被截到 2500 字符，多轮没有意义；
+    # 窗口 32768 后动态预算 ~25K token，「查简报 + 补查两三个维度细节」的
+    # 复合问题需要 8-10 轮才走得完。
+    ai_max_tool_rounds: int = max(1, 10)
     # 连续 N 轮工具调用全部与之前重复（没有任何新工具被调用）时提前收尾，
-    # 不再白烧剩余轮数；小模型在无对应工具时会反复扫零参数工具，见 services/ai_coach.py
-    ai_stale_round_limit: int = max(1, 2)
+    # 不再白烧剩余轮数；小模型在无对应工具时会反复扫零参数工具，见 services/ai_coach.py。
+    # 轮数上限放宽到 10 后同步放宽到 3，避免模型偶尔的重复波动被过早掐死
+    ai_stale_round_limit: int = max(1, 3)
     # llama-server 的单次请求上下文窗口（token）。lm_manager 用它拼 --ctx-size，
     # 是「模型窗口」的唯一事实来源，不要在别处再写死数字。
     # 8K 时代的实测口径（Qwen3-8B）：33 个工具 schema ≈ 5041 token、系统提示词 ≈ 1376 token，
@@ -66,8 +70,12 @@ class Settings(BaseSettings):
     ai_draft_model_path: str = ""
     # llama.cpp 解压目录（含 bin/llama-server.exe）；留空则取项目根目录下的 llama/
     ai_llama_dir: str = ""
-    # AI 工具路由（按语汇裁剪下发的工具 schema）总开关，AI_TOOL_ROUTING=false 整体关掉
-    ai_tool_routing: bool = True
+    # AI 工具路由（按语汇裁剪下发的工具 schema）三态开关：
+    # None（默认）= 按窗口自动——8K 时代全量 schema 占窗口 62%，裁剪是刚需；
+    # 但 32768 窗口下只占 ~16%，裁剪省的窗口抵不上「语汇没命中 → 模型手里没工具」
+    # 的失败模式，故窗口 ≥16384 自动关、<16384 自动开；
+    # 显式设置 AI_TOOL_ROUTING=true/false 则无视窗口强制开/关
+    ai_tool_routing: bool | None = None
     # 解读端点家族（评估/预测/计划/周报/饮食）的专用模型名；留空与主模型同轨
     ai_model_review: str = ""
     # 解读家族是否开思考段：开了会先烧大量 token，需同步放大上限与超时

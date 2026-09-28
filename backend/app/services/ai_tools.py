@@ -88,6 +88,26 @@ TOOLS_SCHEMA: list[dict] = [
         }, "required": []},
     }},
     {"type": "function", "function": {
+        "name": "get_training_history",
+        "description": "按日期区间逐次列出跑步记录（每次一条：日期/标题/距离/时长/配速/心率/步频/负荷）。"
+                       "get_recent_training 只给聚合数字，用户问『上周三跑了多少』『最近几次长距离都是什么配速』"
+                       "『这个月每次训练列给我看』这类逐次明细时必用本工具。",
+        "parameters": {"type": "object", "properties": {
+            "days": {"type": "integer", "description": "回看天数，默认 90，范围 7-365", "default": 90},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "get_activity_detail",
+        "description": "获取某一次跑步的完整明细：逐公里分段配速、心率区间、跑姿动态等设备原始数据，"
+                       "以及关联课表处的单课分析（处方 vs 实际）与教练点评。用户问『上周日那个长距离跑得怎么样』"
+                       "『我那次间歇每公里多少配速』或对某次训练想深入分析时必用；先经 get_training_history 拿到 activity_id，"
+                       "用户指定日期时也可直接传 date。",
+        "parameters": {"type": "object", "properties": {
+            "activity_id": {"type": "integer", "description": "活动 id（来自 get_training_history）"},
+            "date": {"type": "string", "description": "或直接给日期 YYYY-MM-DD；当天有多节跑步时全部返回"},
+        }, "required": []},
+    }},
+    {"type": "function", "function": {
         "name": "get_this_week_workouts",
         "description": "获取当前训练计划中本周（含今天）的逐日课表：日期/类型/标题/距离/时长/结构化步骤摘要/完成状态。用户问『今天/这周练什么』或要求调整课表前必用。",
         "parameters": {"type": "object", "properties": {}, "required": []},
@@ -184,8 +204,8 @@ TOOLS_SCHEMA: list[dict] = [
                        "只传用户明确提到的字段，其余沿用当前目标；应用时会替换当前活动目标（旧目标归档）。"
                        "建议先调 precheck_goal 预检可行性再出提案。提案需用户在界面确认后生效。",
         "parameters": {"type": "object", "properties": {
-            "race_type": {"type": "string", "enum": ["5k", "10k", "hm", "marathon"],
-                          "description": "比赛项目（5k/10k/半马/全马）"},
+            "race_type": {"type": "string", "enum": list(vdot.GOAL_RACE_TYPES),
+                          "description": "比赛项目（800米/1000米/1500米/3公里/5公里/10公里/半马/全马）"},
             "target_time_sec": {"type": "integer",
                                 "description": "目标完赛时间（秒），必须换算：全马330=3小时30分=12600、半马2小时=7200；没提成绩就不要传"},
             "target_date": {"type": "string",
@@ -196,6 +216,27 @@ TOOLS_SCHEMA: list[dict] = [
         "name": "get_daily_checkin",
         "description": "获取今天的主观感受打卡（睡眠质量/酸痛/精力/动力/疼痛部位）、补给状态（fueling_level）与引擎给出的今日训练建议档位（正常/减量/仅轻松跑/休息），以及今天计划课的类型。用户问『今天累不累/能不能练/要不要调整』或表示状态不好、没吃够时必用；若建议档位为 reduce/easy/rest 且今天有强度课，应主动用 propose_* 工具给出调整提案。",
         "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "get_coach_briefing",
+        "description": "获取跨域教练简报：今日计划课与打卡建议档位、训练状态（负荷/形态/ACWR/恢复时长）、"
+                       "近 4 周跑量序列、HRV/睡眠要点、补给状态、近 8 周计划执行率、装备告警与 attention 关注项。"
+                       "用户征求建议或想全面了解自己（『给点建议』『我该怎么练』『帮我分析分析』『我现在状态如何』"
+                       "『今天怎么安排』）时必用本工具，不要为凑齐这些常规数字再逐个调其他查询工具；"
+                       "回答必须落到 attention 项与简报里的具体数字上。某一维度需要更多细节时才补查对应 get_* 工具。",
+        "parameters": {"type": "object", "properties": {}, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "remember_user_note",
+        "description": "把用户提到的长期有效信息存入教练长期记忆（伤病史/运动偏好/生活节奏/装备情况/跑步动机，"
+                       "如『右膝有旧伤』『周三加班没法夜跑』『喜欢晨跑』）。用户说出这类信息时主动调用，"
+                       "不要等用户要求。注意：体重/静息心率等档案字段走 propose_profile_update；"
+                       "今天的疲劳、临时安排这类一次性信息不要记。",
+        "parameters": {"type": "object", "properties": {
+            "content": {"type": "string", "description": "一句独立可读的中文事实，如「右膝有旧伤，深蹲会疼」（≤200字）"},
+            "category": {"type": "string", "enum": ["injury", "life", "preference", "gear", "motive", "other"],
+                         "description": "类别：injury 伤病 / life 生活节奏 / preference 偏好 / gear 装备 / motive 动机 / other"},
+        }, "required": ["content"]},
     }},
     {"type": "function", "function": {
         "name": "get_race_history",
@@ -216,7 +257,7 @@ TOOLS_SCHEMA: list[dict] = [
         "name": "precheck_goal",
         "description": "目标可行性预检：给定项目/目标成绩/比赛日期，用引擎判断 VDOT 差距、预计所需周数是否够、日程时段能否支撑峰值长距离。用户提出新目标或改目标时必用，不要自己心算 VDOT。",
         "parameters": {"type": "object", "properties": {
-            "race_type": {"type": "string", "enum": ["5k", "10k", "hm", "marathon"], "description": "比赛项目"},
+            "race_type": {"type": "string", "enum": list(vdot.GOAL_RACE_TYPES), "description": "比赛项目"},
             "target_time_sec": {"type": "integer", "description": "目标完赛时间（秒），如全马 3 小时 30 分 = 12600；无成绩目标可省略"},
             "target_date": {"type": "string", "description": "比赛日期 YYYY-MM-DD，可省略"},
         }, "required": ["race_type"]},
@@ -227,7 +268,7 @@ TOOLS_SCHEMA: list[dict] = [
         "parameters": {"type": "object", "properties": {
             "origin": {"type": "string", "enum": ["japan", "asia", "western", "global"], "description": "按来源地区过滤"},
             "level": {"type": "string", "enum": ["beginner", "intermediate", "advanced", "elite"], "description": "按适用水平过滤"},
-            "race": {"type": "string", "enum": ["5k", "10k", "hm", "marathon"], "description": "按目标项目过滤"},
+            "race": {"type": "string", "enum": list(vdot.GOAL_RACE_TYPES), "description": "按目标项目过滤"},
             "q": {"type": "string", "description": "关键词，如 川内/驿传/阈值/间歇"},
         }, "required": []},
     }},
@@ -286,6 +327,8 @@ TOOL_LABELS = {
     "get_training_status": "查询训练状态面板",
     "get_body_metrics": "查询身体数据趋势",
     "get_recent_training": "查询近期训练",
+    "get_training_history": "查询逐次训练记录",
+    "get_activity_detail": "查询单次训练明细",
     "get_this_week_workouts": "查询本周课表",
     "get_plan_overview": "查询计划概览",
     "get_diet_status": "查询饮食状态",
@@ -299,6 +342,8 @@ TOOL_LABELS = {
     "propose_profile_update": "校验个人信息更新",
     "propose_goal_update": "校验比赛目标更新",
     "get_daily_checkin": "查询今日主观打卡与建议",
+    "get_coach_briefing": "获取跨域教练简报",
+    "remember_user_note": "记录教练长期记忆",
     "get_race_history": "查询比赛成绩与校准",
     "get_load_forecast": "查询前瞻负荷规划",
     "get_gear_status": "查询装备里程状态",
@@ -453,6 +498,86 @@ def _t_recent_training(db: Session, athlete: models.Athlete, args: dict) -> dict
         "intensity_distribution_28d": zones.intensity_distribution(
             acts28, max_hr=athlete.max_hr, resting_hr=athlete.resting_hr),
     }
+
+
+def _t_training_history(db: Session, athlete: models.Athlete, args: dict) -> dict:
+    """逐次跑步记录（get_recent_training 只给聚合，这里给每次一条的明细）。"""
+    days = max(7, min(365, int(args.get("days") or 90)))
+    acts = activities_dicts(db, athlete.id, days=days)
+    runs = sorted((a for a in acts if a["sport"] == "run"),
+                  key=lambda a: a["start_time"], reverse=True)
+    items = []
+    for a in runs:
+        km = (a["distance_m"] or 0) / 1000
+        minutes = (a["duration_sec"] or 0) / 60
+        items.append({
+            "activity_id": a["id"], "date": a["start_time"].date().isoformat(),
+            "title": a["title"], "distance_km": round(km, 2),
+            "duration_min": round(minutes, 1),
+            "pace_str": (vdot.pace_str(1000.0 / (minutes / km))
+                         if km > 0 and minutes > 0 else None),
+            "avg_hr": a.get("avg_hr"), "max_hr": a.get("max_hr"),
+            "avg_cadence": a.get("avg_cadence"), "elevation_m": a.get("elevation_m"),
+            "rpe": a.get("rpe"), "training_load": round(a.get("training_load") or 0),
+        })
+    return {"days": days, "run_count": len(items),
+            "total_km": round(sum(i["distance_km"] for i in items), 1),
+            "runs": items,
+            "note": "要对某一次做深入分析（分段/动态/单课对照）时，用 activity_id 调 get_activity_detail"}
+
+
+def _t_activity_detail(db: Session, athlete: models.Athlete, args: dict) -> dict:
+    """单次活动明细：date 或 activity_id 二选一定位；关联的 plan_workout 带出单课分析。"""
+    if args.get("activity_id"):
+        act = db.get(models.Activity, int(args["activity_id"]))
+        if not act or act.athlete_id != athlete.id:
+            return {"ok": False, "reasons": ["活动不存在或不属于当前档案"]}
+        rows = [act]
+    elif args.get("date"):
+        try:
+            day = date.fromisoformat(str(args["date"]))
+        except ValueError:
+            return {"ok": False, "reasons": ["date 格式应为 YYYY-MM-DD"]}
+        from datetime import datetime as _dt
+        from datetime import time as _time
+        lo = _dt.combine(day, _time.min)
+        rows = [a for a in db.scalars(select(models.Activity).where(
+            models.Activity.athlete_id == athlete.id,
+            models.Activity.start_time >= lo,
+            models.Activity.start_time < lo + timedelta(days=1))).all()
+            if a.sport == "run"]
+        if not rows:
+            return {"ok": False, "reasons": [f"{day.isoformat()} 没有跑步记录"]}
+    else:
+        return {"ok": False, "reasons": ["请提供 activity_id 或 date 之一"]}
+
+    items = []
+    for a in rows:
+        km = (a.distance_m or 0) / 1000
+        minutes = (a.duration_sec or 0) / 60
+        item = {
+            "activity_id": a.id, "date": a.start_time.date().isoformat(),
+            "start_time": a.start_time.strftime("%H:%M"), "title": a.title,
+            "platform": a.platform, "sport": a.sport,
+            "distance_km": round(km, 2), "duration_min": round(minutes, 1),
+            "pace_str": (vdot.pace_str(1000.0 / (minutes / km))
+                         if km > 0 and minutes > 0 else None),
+            "avg_hr": a.avg_hr, "max_hr": a.max_hr, "avg_cadence": a.avg_cadence,
+            "avg_power": a.avg_power, "elevation_m": a.elevation_m,
+            "calories": a.calories, "rpe": a.rpe, "te_aerobic": a.te_aerobic,
+            "te_anaerobic": a.te_anaerobic, "effort_score": a.effort_score,
+            # 设备原始明细（分段/心率区间/跑姿，键随平台而异），结果超长由循环侧统一截断
+            "dynamics": a.dynamics or {}, "raw": a.raw or {},
+        }
+        wo = db.scalar(select(models.PlanWorkout).where(
+            models.PlanWorkout.completed_activity_id == a.id))
+        if wo:
+            item["linked_workout"] = {"date": wo.date.isoformat(), "title": wo.title,
+                                      "session_type": wo.session_type,
+                                      "coach_comment": wo.coach_comment or None,
+                                      "analysis": wo.analysis}
+        items.append(item)
+    return {"activities": items}
 
 
 def _t_this_week(db: Session, athlete: models.Athlete, args: dict) -> dict:
@@ -947,10 +1072,13 @@ def check_profile_update(athlete: models.Athlete, changes: dict,
 
 # ---------------------------------------------------------------- 目标更新提议工具（对话 → 比赛目标提案）
 
-_GOAL_RACE_NAMES = {"5k": "5公里", "10k": "10公里", "hm": "半程马拉松", "marathon": "全程马拉松"}
+_GOAL_RACE_NAMES = vdot.RACE_LABELS_FULL
 # 各项目目标成绩的合理区间（秒）：下限≈接近精英，上限≈走跑结合完赛
-_GOAL_TIME_RANGE = {"5k": (720, 3600), "10k": (1500, 7200),
+_GOAL_TIME_RANGE = {"800m": (75, 360), "1k": (120, 480), "1500m": (210, 720), "3k": (480, 1800),
+                    "5k": (720, 3600), "10k": (1500, 7200),
                     "hm": (3000, 18000), "marathon": (7200, 36000)}
+# 防漂移 tripwire：项目词汇或成绩区间漏了新项目时，导入即炸而不是运行期静默漏判
+assert set(_GOAL_TIME_RANGE) == set(vdot.GOAL_RACE_TYPES), "目标成绩区间缺项目，请与 vdot.RACE_DISTANCES 对齐"
 _GOAL_CHANGE_KEYS = ("race_type", "target_time_sec", "target_date", "target_label")
 
 
@@ -970,11 +1098,11 @@ def check_goal_update(db: Session, athlete: models.Athlete, changes: dict) -> di
         models.Goal.athlete_id == athlete.id,
         models.Goal.status == "active").order_by(models.Goal.id))
     if goal is None and "race_type" not in changes:
-        return {"ok": False, "reasons": ["当前没有活动目标，请先明确比赛项目（5k/10k/半马/全马）"]}
+        return {"ok": False, "reasons": ["当前没有活动目标，请先明确比赛项目（800米～全马均可）"]}
 
     race_type = changes.get("race_type") or goal.race_type
-    if race_type not in _GOAL_RACE_NAMES:
-        return {"ok": False, "reasons": [f"比赛项目必须是 5k/10k/hm/marathon，收到 {race_type!r}"]}
+    if race_type not in vdot.GOAL_RACE_TYPES:
+        return {"ok": False, "reasons": [f"不支持的比赛项目 {race_type!r}，可选：800m/1k/1500m/3k/5k/10k/hm/marathon"]}
 
     sec = goal.target_time_sec if goal else None
     if "target_time_sec" in changes:
@@ -1044,8 +1172,8 @@ def check_goal_update(db: Session, athlete: models.Athlete, changes: dict) -> di
 
 def precheck_goal_impl(db: Session, athlete: models.Athlete, args: dict) -> dict:
     race_type = args.get("race_type")
-    if race_type not in ("5k", "10k", "hm", "marathon"):
-        return {"ok": False, "reasons": ["race_type 必须是 5k/10k/hm/marathon"]}
+    if race_type not in vdot.GOAL_RACE_TYPES:
+        return {"ok": False, "reasons": [f"不支持的比赛项目 {race_type!r}，可选：800m/1k/1500m/3k/5k/10k/hm/marathon"]}
     target_sec = args.get("target_time_sec")
     target_date = args.get("target_date")
     pred = build_prediction(db, athlete.id)
@@ -1164,6 +1292,135 @@ def _objective_signal(db: Session, athlete: models.Athlete) -> dict:
 def _diet_fueling_context(db: Session, athlete: models.Athlete) -> dict | None:
     from ..data import diet_analysis_payload
     return diet_analysis_payload(db, athlete).get("fueling")
+
+
+def _t_coach_briefing(db: Session, athlete: models.Athlete, args: dict) -> dict:
+    """跨域教练简报：把「给点建议/我状态如何」类问题需要的各域要点聚合成一次调用。
+
+    各域只取要点、控制简报体积，模型对某一域需要更多细节时再补查对应 get_* 工具；
+    装配全部走引擎函数，与各页面口径一致。
+    """
+    from .load_status import build_training_status
+
+    today = date.today()
+    acts = activities_dicts(db, athlete.id, days=200)
+    metrics = body_metrics_dicts(db, athlete.id, days=60)
+
+    # 训练状态（负荷/形态），与「训练状态面板」同引擎
+    ad = {"max_hr": athlete.max_hr, "resting_hr": athlete.resting_hr,
+          "hrv_baseline": athlete.hrv_baseline, "weight_kg": athlete.weight_kg}
+    plan = active_plan(db)
+    st = build_training_status(acts, ad, metrics,
+                               race_date=plan.race_date if plan else None)
+    status_brief = {k: st.get(k) for k in
+                    ("status", "readiness", "acwr", "fitness", "fatigue", "form",
+                     "recovery_time_h", "load_focus", "monotony")}
+
+    # 今日课 + 打卡建议（含补给联动与客观信号封顶）
+    checkin = _t_daily_checkin(db, athlete, {})
+    advice = checkin.get("advice") or {}
+    fueling = diet_analysis_payload(db, athlete).get("fueling") or {}
+
+    # HRV / 睡眠要点（近 7 天）
+    recent7 = [m for m in metrics if m["date"] >= today - timedelta(days=7)]
+    recent7.sort(key=lambda m: m["date"], reverse=True)
+    hrv_last = next((m.get("hrv_rmssd") for m in recent7
+                     if m.get("hrv_rmssd") is not None), None)
+    baseline = athlete.hrv_baseline
+    sleeps = [m.get("sleep_hours") for m in recent7 if m.get("sleep_hours") is not None]
+
+    # 近 8 周计划执行率与装备告警（只带需要处理的）
+    adherence = plan_adherence_dict(db, athlete.id)
+    flagged_gears = [g for g in (_t_gear_status(db, athlete, {}).get("gears") or [])
+                     if g.get("flag") not in ("正常", "已退役")]
+
+    # attention：需要模型在回答里点名处理的项（在这里用规则筛，解释交给模型）
+    attention: list[str] = []
+    if advice.get("suggested_action"):
+        attention.append(f"今日建议档位 {advice.get('level')}：{(advice.get('verdict') or '').strip()}")
+    if (checkin.get("checkin") or {}).get("pain_area"):
+        attention.append(f"今日打卡疼痛部位：{checkin['checkin']['pain_area']}")
+    if fueling.get("level") in ("low", "deficit"):
+        attention.append(f"补给状态 {fueling.get('level')}：{'；'.join(fueling.get('reasons') or [])}")
+    acwr = st.get("acwr")
+    if acwr is not None and acwr > 1.5:
+        attention.append(f"ACWR {acwr} 偏高，注意负荷回调")
+    form = st.get("form")
+    if form is not None and form <= -3:
+        attention.append(f"疲劳累积（form {form}），建议安排恢复")
+    for g in flagged_gears:
+        attention.append(f"跑鞋「{g['name']}」{g['flag']}（累计 {g['total_km']}km）")
+    if adherence and adherence["total"] and adherence["completed"] / adherence["total"] < 0.6:
+        attention.append(f"近 8 周计划课完成率仅 {round(adherence['completed'] / adherence['total'] * 100)}%")
+    if not acts and not metrics:
+        attention.append("平台暂无训练/身体数据，可引导用户到「设置 → 平台连接」同步或到对应页面手动录入")
+
+    return {
+        "today": today.isoformat(),
+        "today_workout": checkin.get("today_workout"),
+        "checkin": checkin.get("checkin"),
+        "today_advice": {"level": advice.get("level"),
+                         "suggested_action": advice.get("suggested_action"),
+                         "verdict": advice.get("verdict")},
+        "training_status": status_brief,
+        "weekly_km_series_4w": evaluator.weekly_km_series(acts, 4),
+        "body": {"hrv_latest": hrv_last, "hrv_baseline": baseline,
+                 "hrv_vs_baseline_pct": (round((hrv_last - baseline) / baseline * 100)
+                                         if (hrv_last and baseline) else None),
+                 "sleep_avg_7d": round(sum(sleeps) / len(sleeps), 1) if sleeps else None},
+        "fueling": {"level": fueling.get("level"), "reasons": fueling.get("reasons")},
+        "plan_adherence_8w": adherence,
+        "gear_alerts": flagged_gears,
+        "attention": attention,
+        "note": "本简报为各域要点汇总；某一维度需要更多细节时再补查对应 get_* 工具",
+    }
+
+
+NOTE_CATEGORIES = ("injury", "life", "preference", "gear", "motive", "other")
+NOTE_MAX_ACTIVE = 50          # 记忆条数上限：防止模型频繁调用把提示词灌爆
+NOTE_MAX_CHARS = 200
+
+
+def remember_note(db: Session, athlete_id: int, content: str,
+                  category: str = "other", source: str = "ai") -> dict:
+    """写入一条长期记忆（工具与路由共用）。重复内容幂等，超出上限自动停用最旧的。
+
+    即时落库：这是教练自己的记忆，无执行风险，不走提案两段式；
+    工具循环的会话不保证 commit，这里必须自己提交。
+    """
+    content = (content or "").strip()
+    if not (2 <= len(content) <= NOTE_MAX_CHARS):
+        return {"ok": False, "reasons": [f"记忆内容需为 2-{NOTE_MAX_CHARS} 字的一句话"]}
+    if category not in NOTE_CATEGORIES:
+        category = "other"
+    dup = db.scalar(select(models.CoachNote).where(
+        models.CoachNote.athlete_id == athlete_id,
+        models.CoachNote.content == content,
+        models.CoachNote.active.is_(True)))
+    if dup:
+        return {"ok": True, "duplicate": True, "note_id": dup.id,
+                "hint": "该内容已在长期记忆中，无需重复记录"}
+    active_count = len(db.scalars(select(models.CoachNote.id).where(
+        models.CoachNote.athlete_id == athlete_id,
+        models.CoachNote.active.is_(True))).all())
+    if active_count >= NOTE_MAX_ACTIVE:
+        oldest = db.scalars(select(models.CoachNote).where(
+            models.CoachNote.athlete_id == athlete_id,
+            models.CoachNote.active.is_(True)).order_by(
+            models.CoachNote.updated_at, models.CoachNote.id)).first()
+        if oldest:
+            oldest.active = False
+    note = models.CoachNote(athlete_id=athlete_id, content=content,
+                            category=category, source=source)
+    db.add(note)
+    db.commit()
+    return {"ok": True, "note_id": note.id,
+            "hint": "已记住。可在回答中自然提及，不要生硬复述这条动作"}
+
+
+def _t_remember_note(db: Session, athlete: models.Athlete, args: dict) -> dict:
+    return remember_note(db, athlete.id, str(args.get("content") or ""),
+                         str(args.get("category") or "other"), source="ai")
 
 
 def _t_race_history(db: Session, athlete: models.Athlete, args: dict) -> dict:
@@ -1399,6 +1656,8 @@ TOOL_IMPLS: dict[str, ToolImpl] = {
     "get_training_status": _t_training_status,
     "get_body_metrics": _t_body_metrics,
     "get_recent_training": _t_recent_training,
+    "get_training_history": _t_training_history,
+    "get_activity_detail": _t_activity_detail,
     "get_this_week_workouts": _t_this_week,
     "get_plan_overview": _t_plan_overview,
     "get_diet_status": _t_diet,
@@ -1418,6 +1677,8 @@ TOOL_IMPLS: dict[str, ToolImpl] = {
         a, args, confirm_anomaly=bool(args.get("confirm_anomaly"))),
     "propose_goal_update": lambda db, a, args: check_goal_update(db, a, args),
     "get_daily_checkin": _t_daily_checkin,
+    "get_coach_briefing": _t_coach_briefing,
+    "remember_user_note": _t_remember_note,
     "get_race_history": _t_race_history,
     "get_load_forecast": _t_load_forecast,
     "get_gear_status": _t_gear_status,

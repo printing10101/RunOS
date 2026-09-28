@@ -186,6 +186,44 @@ def delete_conversation(cid: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+# ---------------------------------------------------------------- 教练长期记忆
+# 对话中由 remember_user_note 工具沉淀（services/ai_tools.remember_note），
+# 每轮注入 system prompt；这里提供查看/添加/删除（软删除）供前端管理。
+
+@router.get("/notes")
+def list_notes(db: Session = Depends(get_db)):
+    athlete = require_athlete(db)
+    rows = db.scalars(select(models.CoachNote).where(
+        models.CoachNote.athlete_id == athlete.id,
+        models.CoachNote.active.is_(True)).order_by(
+        models.CoachNote.updated_at.desc(), models.CoachNote.id.desc())).all()
+    return {"notes": [{"id": n.id, "content": n.content, "category": n.category,
+                       "source": n.source,
+                       "updated_at": n.updated_at.isoformat() if n.updated_at else None}
+                      for n in rows]}
+
+
+@router.post("/notes")
+def create_note(data: schemas.CoachNoteCreateIn, db: Session = Depends(get_db)):
+    athlete = require_athlete(db)
+    result = ai_tools.remember_note(db, athlete.id, data.content,
+                                    data.category or "other", source="user")
+    if not result.get("ok"):
+        raise HTTPException(400, "；".join(result.get("reasons") or ["内容不合法"]))
+    return result
+
+
+@router.delete("/notes/{nid}")
+def delete_note(nid: int, db: Session = Depends(get_db)):
+    athlete = require_athlete(db)
+    note = db.get(models.CoachNote, nid)
+    if not note or note.athlete_id != athlete.id:
+        raise HTTPException(404, "记忆不存在")
+    note.active = False
+    db.commit()
+    return {"ok": True}
+
+
 @router.post("/chat")
 def chat(data: schemas.AiChatIn, db: Session = Depends(get_db)):
     """SSE 流：data: {"type": "delta|tool|proposals|error|done", ...}
@@ -217,11 +255,21 @@ def chat(data: schemas.AiChatIn, db: Session = Depends(get_db)):
             conv.title = user_text[:24] or conv.title
         db.commit()
 
+    def _persist_summary(conv):
+        """滚动摘要落库回调：压缩发生在流式回答开始前，落库即时生效。"""
+        def _cb(new_summary: str) -> None:
+            conv.summary = new_summary
+            db.commit()
+        return _cb
+
     def gen():
         content_acc: list[str] = []
         tools_acc: list[dict] = []
         proposals_acc: list[dict] = []
-        for event in ai_coach.chat_stream(db, history):
+        for event in ai_coach.chat_stream(
+                db, history,
+                summary=(conv.summary or "") if conv is not None else None,
+                on_summary=_persist_summary(conv) if conv is not None else None):
             if event["type"] == "delta":
                 content_acc.append(event.get("text") or "")
             elif event["type"] == "tool":
@@ -449,6 +497,59 @@ def apply_proposal(data: schemas.AiProposalApplyIn, db: Session = Depends(get_db
     if handler is None:
         raise HTTPException(400, "未知提案类型")
     return handler(db, athlete, data)
+
+
+@router.get("/proposals/pending")
+def pending_proposals(db: Session = Depends(get_db)):
+    """漂移引擎的待确认建议：每次拉取都会重跑引擎（挂新卡/更新理由/自动撤回失效卡）。"""
+    from ..services import proposal_store
+    athlete = require_athlete(db)
+    return {"proposals": proposal_store.list_pending(db, athlete)}
+
+
+@router.get("/proposals/history")
+def proposal_history(limit: int = 20, db: Session = Depends(get_db)):
+    """调整时间线：已决定（采纳/忽略/自动撤回）的引擎建议，新的在前。"""
+    from ..services import proposal_store
+    athlete = require_athlete(db)
+    return {"history": proposal_store.list_history(db, athlete, limit)}
+
+
+@router.post("/proposals/{proposal_id}/apply")
+def apply_engine_proposal(proposal_id: int, db: Session = Depends(get_db)):
+    """采纳引擎建议：与对话提案同一批应用函数重检写入（两段式的「apply 重检」半边）。"""
+    from ..services import proposal_store
+    athlete = require_athlete(db)
+    p = proposal_store.get_pending(db, athlete, proposal_id)
+    try:
+        data = schemas.AiProposalApplyIn(**(p.payload or {}))
+    except Exception:
+        proposal_store.decide(db, p, "withdrawn")
+        raise HTTPException(400, "提案参数不合法，已自动撤回") from None
+    handler = _PROPOSAL_APPLIERS.get(data.kind)
+    if handler is None:
+        proposal_store.decide(db, p, "withdrawn")
+        raise HTTPException(400, "未知提案类型，已自动撤回")
+    try:
+        result = handler(db, athlete, data)
+    except HTTPException as e:
+        # 重检没过（课表状态在挂卡之后变了）：卡片自动撤回，原因还给前端
+        db.rollback()
+        proposal_store.decide(db, p, "withdrawn")
+        raise HTTPException(e.status_code, f"{e.detail}；该建议已自动撤回") from e
+    proposal_store.decide(db, p, "applied")
+    # 采纳后立刻重跑引擎：前瞻负荷是读时计算的，前端重新拉取即是采纳后的最新投影
+    remaining = proposal_store.list_pending(db, athlete)
+    return {"ok": True, "result": result, "remaining": remaining}
+
+
+@router.post("/proposals/{proposal_id}/dismiss")
+def dismiss_engine_proposal(proposal_id: int, db: Session = Depends(get_db)):
+    from ..services import proposal_store
+    athlete = require_athlete(db)
+    p = proposal_store.get_pending(db, athlete, proposal_id)
+    proposal_store.decide(db, p, "dismissed")
+    return {"ok": True}
 
 
 @router.post("/plan/from-text")

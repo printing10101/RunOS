@@ -21,6 +21,13 @@ OPTIONAL_NAMES = set(ai_coach.KNOWLEDGE_TOOLS) | set(ai_coach.PROFILE_GOAL_TOOLS
 ALWAYS_ON = [n for n in ALL_NAMES if n not in OPTIONAL_NAMES]
 
 
+@pytest.fixture(autouse=True)
+def _force_routing_on(monkeypatch):
+    """路由默认已改为按窗口自动（32768 窗口下关闭）；本文件测的是路由机制本身，
+    除个别用例外统一强制开启。"""
+    monkeypatch.setattr(ai_coach, "TOOL_ROUTING_ENABLED", True)
+
+
 def _names(schema: list[dict]) -> list[str]:
     return [t["function"]["name"] for t in schema]
 
@@ -182,9 +189,9 @@ def test_loop_hands_the_routed_budget_to_trimming(monkeypatch):
     seen: list[int] = []
     real_trim = ai_coach._trim_context
 
-    def spy(msgs, budget):
+    def spy(msgs, budget, dropped_out=None):
         seen.append(budget)
-        return real_trim(msgs, budget)
+        return real_trim(msgs, budget, dropped_out=dropped_out)
 
     monkeypatch.setattr(ai_coach, "_trim_context", spy)
     client = FakeClient(tool_rounds=[[_tool_chunk("get_recovery_status")],

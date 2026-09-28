@@ -45,7 +45,7 @@ def captured(monkeypatch):
 
     seen: list[list[dict]] = []
 
-    def fake_chat_stream(db, history):
+    def fake_chat_stream(db, history, summary=None, on_summary=None):
         seen.append([dict(m) for m in history])
         yield {"type": "delta", "text": "（假回答）"}
 

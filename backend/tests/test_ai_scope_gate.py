@@ -1,7 +1,12 @@
-"""能力闸门：确定性判定「能力外请求」，不进工具循环。
+"""能力闸门：确定性判定「能力外请求」，注入指引并约束本轮回答。
 
 为什么要代码闸门而不是只靠提示词：提示词里的能力边界靠模型自觉，8B 并不总能自觉。
 闸门把「能不能做」这个判断从模型手里拿走（确定性），模型只负责把已判定的指引说成人话。
+
+命中后的处置（2026-09-28 起）：指引作为 system 注记注入本轮消息，常驻工具**照常下发**——
+用户一句话常混着在域部分（「帮我同步下，顺便分析下我的恢复」），硬断粮会让在域部分
+也答不了；执行类诉求由注入的指引明确拒绝，模型硬拿查询工具「试探」时由
+重复短路/停滞早停兜住。收尾请求仍禁用工具。
 
 判定必须带**祈使信号**（请/帮我/怎么… 或 动词+一下）才算命中，否则会把
 「同步过来的数据」这类在域描述误判成同步请求——下面那份在域语料就是这套正则的护栏，
@@ -60,6 +65,8 @@ IN_DOMAIN = [
     "推荐一个适合我的计划",
     "把周四的间歇减两组",
     "今天该吃什么",
+    "帮我看看买什么跑鞋合适",          # ← 装备咨询是在域的，只有「帮我买」才算购物请求
+    "帮我推荐一双跑鞋",
 ]
 
 
@@ -80,33 +87,38 @@ def test_empty_and_blank_text_is_not_gated():
 _ORIGINAL_REQUEST = "请你去同步一下我在高驰上的课表，同步到这个软件的训练计划里"
 
 
-def test_gate_skips_tool_loop_entirely(monkeypatch):
-    """原始失败场景：必须一次工具都不调，改用无工具收尾作答，且产出指路文案而非报错。"""
-    client = FakeClient(tool_rounds=[[_tool_chunk("get_athlete_profile")]],
-                        final=[_text_chunk(ai_coach.PLATFORM_GUIDANCE)])
+def test_gate_guidance_injected_and_no_tools_executed(monkeypatch):
+    """闸门命中：指引注入本轮消息，模型直接作答 → 不执行任何工具，产出指路文案而非报错。"""
+    client = FakeClient(tool_rounds=[], final=[_text_chunk(ai_coach.PLATFORM_GUIDANCE)])
     executed: list = []
     _install(monkeypatch, client, executed)
 
     events = list(ai_coach.chat_stream(None, [{"role": "user", "content": _ORIGINAL_REQUEST}]))
 
-    assert client.tool_requests == [], "闸门命中时不得发起任何带工具请求"
-    assert executed == [], "不得执行任何工具"
+    assert executed == [], "闸门命中时不得执行任何工具"
     assert len(client.finalize_requests) == 1, "必须发起恰好一次无工具收尾请求"
     assert "平台连接" in _deltas(events)
     assert not [e for e in events if e["type"] == "error"], "有指引就不该再报错"
+    # 指引必须真的注入了本轮消息——混合请求时模型靠它知道执行类诉求被拒绝
+    assert any(m.get("role") == "system" and "平台连接" in str(m.get("content"))
+               for m in client.calls[0]["messages"])
 
 
-def test_gate_wins_over_tool_routing(monkeypatch):
-    """闸门先于路由：即使问题里带知识库语汇，也不该因为路由而进工具循环。"""
-    client = FakeClient(tool_rounds=[], final=[_text_chunk(ai_coach.PLATFORM_GUIDANCE)])
+def test_gate_mixed_request_still_answers_the_in_domain_part(monkeypatch):
+    """混合请求（执行类 + 在域查询）：执行类被指引拒绝，在域部分照常查数据回答。
+    这是「命中即断粮」改「注入指引 + 保留工具」的核心场景。"""
+    client = FakeClient(
+        tool_rounds=[[_tool_chunk("get_recovery_status")]],
+        final=[_text_chunk("同步我做不了，请到「设置 → 平台连接」页操作；你的恢复状态不错。")])
     executed: list = []
     _install(monkeypatch, client, executed)
 
-    list(ai_coach.chat_stream(
-        None, [{"role": "user", "content": "帮我同步一下汉森训练法的课表"}]))
+    events = list(ai_coach.chat_stream(None, [{"role": "user", "content":
+                   "帮我把数据同步一下，顺便分析下我的恢复状态"}]))
 
-    assert client.tool_requests == [], "闸门必须优先于工具路由生效"
-    assert executed == []
+    assert executed == [("get_recovery_status", {})], "在域部分必须照常走工具"
+    assert "平台连接" in _deltas(events), "执行类诉求的指引必须出现在回答里"
+    assert not [e for e in events if e["type"] == "error"]
 
 
 def test_gate_falls_back_to_guidance_when_model_says_nothing(monkeypatch):
@@ -120,6 +132,23 @@ def test_gate_falls_back_to_guidance_when_model_says_nothing(monkeypatch):
     assert _deltas(events) == ai_coach.PLATFORM_GUIDANCE
     assert not [e for e in events if e["type"] == "error"], "不应把能力缺口包装成错误"
     assert events[-1]["type"] == "done"
+
+
+def test_gate_note_survives_tool_routing(monkeypatch):
+    """闸门先于路由注入指引：即使问题里带知识库语汇、路由给了知识库工具，
+    指引也必须注入本轮消息（工具可以给，被拒绝的诉求要说清）。"""
+    monkeypatch.setattr(ai_coach, "TOOL_ROUTING_ENABLED", True)
+    client = FakeClient(tool_rounds=[], final=[_text_chunk(ai_coach.PLATFORM_GUIDANCE)])
+    executed: list = []
+    _install(monkeypatch, client, executed)
+
+    events = list(ai_coach.chat_stream(
+        None, [{"role": "user", "content": "帮我同步一下汉森训练法的课表"}]))
+
+    assert executed == [], "被拒绝的同步诉求不得真的执行任何工具"
+    assert "平台连接" in _deltas(events)
+    assert any(m.get("role") == "system" and "平台连接" in str(m.get("content"))
+               for m in client.calls[0]["messages"])
 
 
 def test_in_domain_request_still_uses_the_tool_loop(monkeypatch):

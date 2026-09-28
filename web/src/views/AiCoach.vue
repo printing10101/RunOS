@@ -26,6 +26,28 @@
       <el-button size="small" round :disabled="streaming" @click="newChat">＋ 新对话</el-button>
       <el-button v-if="conversationId" size="small" round type="danger" plain
                  :disabled="streaming" @click="deleteChat">删除</el-button>
+      <el-popover v-model:visible="notesVisible" placement="bottom-end" :width="380" trigger="click" @show="loadNotes">
+        <template #reference>
+          <el-button size="small" round style="margin-left:auto">🧠 记忆{{ notes.length ? ` ${notes.length}` : '' }}</el-button>
+        </template>
+        <div class="notes-pop">
+          <div class="notes-head">教练长期记忆 <span class="notes-sub">聊天中自动沉淀，回答时会参考</span></div>
+          <div class="notes-add">
+            <el-input v-model="newNote" size="small" placeholder="手动记一条，如：右膝有旧伤" @keydown.enter="addNote" />
+            <el-button size="small" round type="primary" plain :loading="addingNote" @click="addNote">记下</el-button>
+          </div>
+          <div v-if="!notes.length" class="notes-empty">
+            还没有记忆。聊天时告诉教练你的伤病史、偏好或生活节奏，它会自己记住。
+          </div>
+          <div v-for="n in notes" :key="n.id" class="note-row">
+            <el-tag size="small" effect="plain" :type="n.category === 'injury' ? 'danger' : 'info'">
+              {{ CAT_CN[n.category] || '其他' }}
+            </el-tag>
+            <span class="note-content">{{ n.content }}</span>
+            <el-button link size="small" type="danger" @click="removeNote(n)">删</el-button>
+          </div>
+        </div>
+      </el-popover>
     </div>
 
     <div class="chat-box" ref="chatBox">
@@ -90,6 +112,12 @@ const chatBox = ref(null)
 // 会话持久化：历史由服务端从库内加载并落库，刷新页面后聊天记录不丢
 const conversations = ref([])
 const conversationId = ref(null)
+// 教练长期记忆：聊天中自动沉淀 + 手动增删，注入每轮 system prompt
+const notes = ref([])
+const notesVisible = ref(false)
+const newNote = ref('')
+const addingNote = ref(false)
+const CAT_CN = { injury: '伤病', life: '生活', preference: '偏好', gear: '装备', motive: '动机', other: '其他' }
 // 跟踪正在进行的流式请求，组件卸载时中止，避免写已卸载组件
 let activeAbort = null
 
@@ -112,8 +140,37 @@ function renderRich(text) {
     .replace(/`([^`]+)`/g, '<code>$1</code>')
 }
 
-onMounted(() => { loadStatus(); loadConversations({ autoResume: true }) })
+onMounted(() => { loadStatus(); loadConversations({ autoResume: true }); loadNotes() })
 async function loadStatus() { try { status.value = await api.get('/ai/status') } catch { status.value = { reachable: false } } }
+
+async function loadNotes() {
+  try {
+    const data = await api.get('/ai/notes')
+    notes.value = data.notes || []
+  } catch { /* 记忆拉取失败不阻塞聊天 */ }
+}
+
+async function addNote() {
+  const content = newNote.value.trim()
+  if (content.length < 2) return
+  addingNote.value = true
+  try {
+    await api.post('/ai/notes', { content })
+    newNote.value = ''
+    loadNotes()
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '记录失败')
+  } finally { addingNote.value = false }
+}
+
+async function removeNote(n) {
+  try {
+    await api.del(`/ai/notes/${n.id}`)
+    notes.value = notes.value.filter(x => x.id !== n.id)
+  } catch (e) {
+    ElMessage.error(e.response?.data?.detail || '删除失败')
+  }
+}
 
 async function loadConversations({ autoResume = false } = {}) {
   try {
@@ -263,6 +320,14 @@ async function applyProposal(p) {
 
 .conv-bar { display: flex; gap: 8px; align-items: center; padding: 10px 0 0; }
 .conv-select { width: 260px; }
+
+.notes-pop { display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; }
+.notes-head { font-weight: 700; font-size: 13.5px; }
+.notes-sub { font-weight: 400; font-size: 11.5px; color: var(--text-3); margin-left: 6px; }
+.notes-add { display: flex; gap: 8px; }
+.notes-empty { font-size: 12.5px; color: var(--text-3); line-height: 1.7; }
+.note-row { display: flex; align-items: center; gap: 8px; }
+.note-content { flex: 1; font-size: 13px; line-height: 1.5; }
 
 .msg-row { display: flex; gap: 10px; }
 .msg-row.user { justify-content: flex-end; }

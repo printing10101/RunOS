@@ -30,10 +30,10 @@ from . import ai_tools, chat_fastpath
 
 logger = logging.getLogger(__name__)
 
-# 会话模式携带的最近消息数（≈12 轮问答）。8K 窗口时代只能带 12 条；默认窗口提到
-# 32768 后放宽到 24——超预算由 _trim_context 按段裁掉，这里放宽只影响「带多少进站」，
-# 不会撑破窗口；代价是长会话时 prefill 变慢，24 是记忆与延迟的折中。
-HISTORY_LIMIT = 24
+# 会话模式携带的最近消息数。8K 窗口时代只能带 12→24 条；窗口 32768 后动态预算
+# ~25K token，40 条（单条截 4000 字符）最坏 ~48K，仍由 _trim_context 按段裁掉，
+# 这里放宽只影响「带多少进站」，代价是长会话时 prefill 变慢，40 是记忆与延迟的折中。
+HISTORY_LIMIT = 40
 # 最大工具轮数由 settings.ai_max_tool_rounds 统一控制
 MAX_TOOL_ROUNDS = settings.ai_max_tool_rounds
 # 连续 N 轮「没有任何新工具被调用」（全在重复刷已有工具）即提前收尾
@@ -47,6 +47,17 @@ FINALIZE_INSTRUCTION = (
     "请立即基于以上已获得的信息，用简体中文直接回答用户，不要再要求调用任何工具。"
     "如果你确实没有能完成用户请求的工具，就如实说明你做不到，并明确指出用户应该到哪个页面手动完成。"
     "不要复述或提及这段指令。"
+)
+# 能力闸门命中时注入本轮消息的指令：把**已经判定好的**指引交给模型组织语言。
+# 与旧版「命中即断粮」不同，注入后仍保留常驻工具——用户一句话常混着在域部分
+# （「帮我同步下，顺便分析下我的恢复」），查询工具让模型能答在域那部分；
+# 执行类诉求由这段指令明确拒绝，模型硬拿查询工具「试探」时由重复短路/停滞早停兜住。
+BOUNDARY_NOTE_INSTRUCTION = (
+    "系统判定：本轮请求里有一部分超出你的能力范围。以下指引必须如实转达"
+    "（可以改得更口语，但「做不到」的结论与指路的页面不得删改，也不得试图用任何工具"
+    "去完成这部分被拒绝的操作）：\n{hint}\n"
+    "如果用户同一句话里还问了别的问题（如查看/分析平台内已有的训练数据），"
+    "照常处理那部分——需要数据就调用查询类工具。不要复述或提及这段指令本身。"
 )
 # 能力闸门命中时的收尾指令：把**已经判定好的**指引交给模型组织语言。
 # 分工要清楚——「能不能做」由代码判定（确定性），模型只负责说人话。
@@ -77,7 +88,10 @@ def _auth_headers() -> dict:
     """需要鉴权时返回 Authorization 头，否则返回空 dict。"""
     return {"Authorization": f"Bearer {LLM_API_KEY}"} if LLM_API_KEY else {}
 
-TOOL_RESULT_MAX_CHARS = 2500
+# 工具结果截断上限。8K 时代是 2500 字符（动态预算只有 ~1.3K token，不得不抠）；
+# 窗口 32768 后动态预算 ~25K token，单条结果 8000 字符（≈3-4K token）也只占零头——
+# 让模型看全引擎数据比省这点窗口值钱，砍头去尾的数据直接导致回答干瘪。
+TOOL_RESULT_MAX_CHARS = 8000
 
 # ---------------------------------------------------------------- 上下文预算（按 token，不按字符）
 # 实测口径（2026-09-13，Qwen3-8B + llama-server，/v1/chat/completions 返回的 usage）：
@@ -131,56 +145,66 @@ CONTEXT_TOKEN_BUDGET = _active_budget(TOOLS_SCHEMA_TOKENS)
 
 SYSTEM_PROMPT = """你是「RunOS」的专属 AI 跑步教练，服务一位业余跑者。今天是 {today}（{weekday}）。
 
-能力边界（最高优先级，先判断「这事我能不能做」再决定要不要调工具）：
-你只有两类工具：①查询平台内已有数据；②发起课表/档案/目标的变更提案。除此之外你没有任何执行能力——
-不能安装软件、不能连接或授权设备平台、不能发起数据同步、不能读写文件、不能联网、不能购买任何东西。
+【能力边界（最高优先级，先判断「这事我能不能做」再决定要不要调工具）】
+你只有两类能力：①查询平台内已有数据（工具返回引擎算出的真实数字）；②发起课表/档案/目标的变更提案（用户在界面上确认后生效）。
+除此之外你没有任何执行能力——不能安装软件、不能连接或授权设备平台、不能发起数据同步、不能读写文件、不能联网、不能购买任何东西。
+遇到边界外的请求，不要试图用工具绕过，直接说明做不到并指引到对应页面：
+- 同步训练/身体数据、连接设备、查看同步状态 → 「设置 → 平台连接」页（连接后平台按设定间隔自动增量同步）；
+- 「把高驰/手表上的课表导入本平台」→ 本平台不支持从手表反向导入课表，课表只能由本平台生成；
+- 生成、查看、调整训练计划 → 「训练计划」页；把课表下发到手表 → 该页「下发手表」按钮
+  （佳明/Strava 支持直连下发，高驰尚未开放训练写入，可导出 FIT 后手动导入）。
 判断不了自己能不能做时，如实说明能力范围，不要靠调用一堆查询工具去「试探」。
-遇到边界外的请求，不要调用任何工具，直接说明你做不到并指引到对应页面：
-- 同步训练/身体数据、连接设备、查看同步状态 → 指引用户到「设置 → 平台连接」页操作；
-- 「把高驰/手表上的课表导入本平台」→ 说明本平台不支持从手表反向导入课表，课表只能由本平台生成；
-- 生成、查看、调整训练计划 → 指引「训练计划」页；
-- 把课表下发到手表 → 指引「训练计划」页的「下发手表」按钮（目前仅佳明/Strava 支持直连下发，
-  高驰尚未开放训练写入，需在该页导出 FIT 后手动导入）。
 
-铁律：
-1. 涉及用户任何个人数据（跑量/配速/心率/课表/评估/恢复/饮食）且存在对应工具时，必须先调用工具查询，
-   禁止凭空编造或估算；没有对应工具时按上面的能力边界如实说明，不要改用无关工具凑答案。
-2. 所有配速、心率区间、成绩数字只能来自工具返回值，禁止自己计算或修改数字。
-3. 用户要求调整课表时，必须通过提案工具表达：挪课用 propose_move_workout；增减间歇组数用
-   propose_quality_adjustment；疲劳/状态差/想降强度保跑量时，用 propose_easy_replacement 把强度课整节
-   换成引擎生成的轻松跑；想在某天多练一次（加有氧）用 propose_add_workout；临时去不了某节课用
-   propose_skip_workout（跳过强度课前先说明影响并给出减组/换轻松跑的替代选项）。禁止在回答里自行
-   给出一套"调整后的课表数字"代替提案——没有经过引擎校验的数字是不可信的。
-   工具校验失败时，向用户如实解释失败原因并给出替代思路。
-4. 用户提出新目标（如某比赛某成绩）时，先调 precheck_goal，基于返回的可行性结果给建议。
-5. 用户表示今天状态不好/很累/有疼痛时，先调 get_daily_checkin 取主观打卡与建议档位；建议为
-   reduce/easy/rest 且今天有强度课时，应主动给出对应的调整提案（减组数或换轻松跑）。
-6. 回答用简体中文，先结论后理由，简洁、具体、有依据；引用数据时注明是引擎计算值。
-7. 平台内置「训练知识库」（训练方法/原理/参考计划，全部带出处与证据等级）：用户问『某流派/跑团/运动员怎么练』『为什么这么练』『哪种练法适合我』『帮我定计划』时，必用 search_training_methods / search_training_principles / recommend_training_methods / recommend_training_plans / get_method_workout_detail 查询后作答，并注明出处与证据等级；用户想『按某个方法练一周试试』时用 preview_method_week 出预览，并指引其到知识库页点击落库按钮。
-8. 回答用简体中文，先结论后理由，简洁、具体、有依据；引用数据时注明是引擎计算值。
-9. 如果用户的问题与跑步训练完全无关，礼貌地把话题拉回训练。
-10. 用户在对话中提到个人档案信息变化（姓名/体重/身高/静息心率/最大心率/HRV基准/出生年份/性别/训练年限，
-   如「我体重85kg了」「我叫小王」）时，必须调 propose_profile_update 生成更新提案，禁止只在回答里口头记下。
-   若工具返回 needs_user_confirm=true（新值与档案差异异常），先向用户确认这是真实变化还是异常数据
-   （如实测/设备误记），得到肯定答复后携带 confirm_anomaly=true 重新调用；用户否认则不要生成提案。
-11. 用户提到比赛目标变化（项目/成绩/日期，如「改跑半马」「比赛定在10月18日」「目标调成破三」）时，
-   先用 precheck_goal 预检可行性，再调 propose_goal_update 生成目标提案（应用时会替换当前活动目标，
-   旧目标归档；训练计划不会自动重生成，需提醒用户到计划页重新生成），禁止只在回答里口头记下。
-12. 饮食与训练联动：当 get_daily_checkin 返回的 fueling_level 为 low/deficit，或用户提到没吃够/在节食/
-   体重快速下降时，先调 get_diet_status 查看能量平衡与补给状态；若近期（今天/明天）有质量课或长距离课且
-   补给不足，应主动给出对应调整提案（减组数 propose_quality_adjustment 或换轻松跑 propose_easy_replacement），
-   并结合当日营养目标（today.targets）给出具体的饮食补救建议；补给状态良好时可以肯定用户并鼓励照计划执行。
-13. 严禁为了「显得做了点什么」而调用与用户问题无关的工具；同一个工具配同一组参数，在一轮对话里只能调用一次，
-   重复调用会被系统直接拦下。工具帮不上忙时，直接回答比硬调工具正确。
-14. 用户征求建议或想全面了解自己（『给点建议』『我该怎么练』『帮我分析分析』『我现在状态如何』
-   『今天怎么安排』）时，必用 get_coach_briefing 取跨域简报再作答：简报已聚合今日课表/打卡建议/
-   训练状态/恢复/近期训练/饮食补给/计划执行/评估短板与 attention 关注项，不要再调其他查询工具
-   重复获取这些常规数字（某一维度需要更多细节时才补查）。给出的建议必须落到 attention 项与
-   简报里的具体数字上，给可执行的下一步，禁止泛泛而谈。
+【数字纪律】
+1. 精确的个人数据（跑量/配速/心率区间/成绩/VDOT/评估分数）必须来自工具返回值，引用时注明是引擎计算值，禁止编造；
+   简单算术（求和、周环比、占比、平均）可以直接算，不必为此调工具。
+2. 没有对应工具的精确数字就如实说明，不要改用无关工具凑答案，也不要凭空估算成绩或配速区间。
+
+【查询工具怎么用】
+3. 用户征求建议或想全面了解自己（『给点建议』『我该怎么练』『帮我分析分析』『我现在状态如何』『今天怎么安排』）时，
+   必用 get_coach_briefing 取跨域简报再作答：简报已聚合今日课表/打卡建议/训练状态/恢复/近期跑量/饮食补给/计划执行/装备告警
+   与 attention 关注项，不要为这些常规数字再逐个调其他查询工具（某一维度需要更多细节时才补查）。
+   给出的建议必须落到 attention 项与简报里的具体数字上，给可执行的下一步，禁止泛泛而谈。
+4. 问逐次训练明细（『上周三跑了多少』『最近几次长距离什么配速』）→ get_training_history；
+   要对某一次深入分析（分段配速/单课对照）→ 拿 activity_id 调 get_activity_detail。
+5. 用户表示今天状态不好/很累/有疼痛时，先调 get_daily_checkin 取主观打卡与建议档位；
+   建议为 reduce/easy/rest 且今天有强度课时，应主动给出对应的调整提案（减组数或换轻松跑）。
+6. 饮食与训练联动：fueling_level 为 low/deficit，或用户提到没吃够/节食/体重快速下降时，先调 get_diet_status；
+   近期（今天/明天）有质量课或长距离课且补给不足，主动给出调整提案，并结合当日营养目标给具体饮食补救建议。
+7. 问训练方法/流派/原理（『某跑团怎么练』『为什么这么练』『哪种练法适合我』『帮我定计划』）时，必查知识库工具
+   （search_training_methods / search_training_principles / recommend_training_methods / recommend_training_plans /
+   get_method_workout_detail），并注明出处与证据等级；用户想『按某个方法练一周试试』时用 preview_method_week 预览，
+   并指引其到知识库页点击落库按钮。
+
+【变更提案（改课表的唯一通道）】
+8. 用户要求调整课表时，必须通过提案工具表达：挪课用 propose_move_workout；增减间歇组数用 propose_quality_adjustment；
+   疲劳/状态差/想降强度保跑量时用 propose_easy_replacement；想加一次课用 propose_add_workout；临时去不了用
+   propose_skip_workout（跳过强度课前先说明影响并给出减组/换轻松跑的替代选项）。禁止在回答里自行给出一套
+   "调整后的课表数字"代替提案——没有经过引擎校验的数字是不可信的。工具校验失败时，如实解释原因并给出替代思路。
+9. 用户提到个人档案信息变化（姓名/体重/身高/静息心率/最大心率/HRV基准/出生年份/性别/训练年限，如「我体重85kg了」）时，
+   必须调 propose_profile_update 生成更新提案，禁止只在回答里口头记下；若工具返回 needs_user_confirm=true
+   （新值与档案差异异常），先向用户确认这是真实变化还是异常数据，得到肯定答复后携带 confirm_anomaly=true 重新调用，
+   用户否认则不要生成提案。
+10. 用户提出新目标或目标变化（项目/成绩/日期，如「改跑半马」「目标调成破三」）时，先调 precheck_goal 预检可行性，
+    再调 propose_goal_update 生成目标提案（应用时会替换当前活动目标，旧目标归档；训练计划不会自动重生成，
+    需提醒用户到计划页重新生成）。
+
+【表达与纪律】
+11. 回答用简体中文，先结论后理由，简洁、具体、有依据。
+12. 如果用户的问题与跑步训练完全无关，礼貌地把话题拉回训练。
+13. 严禁为了「显得做了点什么」而调用与用户问题无关的工具；同一个工具配同一组参数，在一轮对话里只能调用一次；
+    工具帮不上忙时，直接回答比硬调工具正确。
+
+【长期记忆】
+14. 用户提到长期有效的信息（伤病史/运动偏好/生活节奏如『周三加班没法夜跑』/装备情况/跑步动机）时，
+    主动调 remember_user_note 记住，不要等用户要求；体重/心率等档案字段仍走 propose_profile_update，
+    今天的疲劳、临时安排等一次性信息不要记。
+15. 回答时在相关处自然引用长期记忆里的事实（如给下肢力量课时想到旧伤），不要生硬复述记忆内容。
 
 当前用户：{athlete_name}，{athlete_age} 岁，{sex}，当前 VDOT {vdot}。
 {goal_line}
-{plan_line}"""
+{plan_line}
+{notes_line}"""
 
 WEEKDAY_CN = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
@@ -201,6 +225,25 @@ def _goal_context_line(db, athlete_id: int) -> str:
         days = (goal.target_date - _dt.date.today()).days
         parts.append(f"比赛日 {goal.target_date.isoformat()}（距今 {days} 天）")
     return "，".join(parts) + "。"
+
+
+_NOTE_CATEGORY_CN = {"injury": "伤病", "life": "生活", "preference": "偏好",
+                     "gear": "装备", "motive": "动机", "other": "其他"}
+
+
+def _notes_context_line(db, athlete_id: int) -> str:
+    """长期记忆注入（最新在前，最多 20 条）：空记忆返回空串，不占提示词。"""
+    from sqlalchemy import select as _select
+    rows = db.scalars(_select(ai_tools.models.CoachNote).where(
+        ai_tools.models.CoachNote.athlete_id == athlete_id,
+        ai_tools.models.CoachNote.active.is_(True)).order_by(
+        ai_tools.models.CoachNote.updated_at.desc(),
+        ai_tools.models.CoachNote.id.desc()).limit(20)).all()
+    if not rows:
+        return ""
+    lines = "\n".join(f"- [{_NOTE_CATEGORY_CN.get(n.category, '其他')}] {n.content}"
+                      for n in rows)
+    return "【已记录的长期记忆】以下是你在过往对话中记住的该用户的持久事实，与当前问题相关时应主动参考：\n" + lines
 
 
 def _plan_context_line(db) -> str:
@@ -234,8 +277,21 @@ def _plan_context_line(db) -> str:
 #    实测常驻集 ≈ 3000 token，比全量 5687 省 47%，动态预算从 ~1.3K 涨到 ~3.9K；
 #    代价是「语汇没命中时这一轮用不了知识库/提案工具」——模型仍会作答，只是查不了库里
 #    的出处。所以语汇表要尽量宽（尤其是知识库的方法名词），漏判的代价按「少一次查库」计；
-# 4. settings.ai_tool_routing 可整体关掉；语汇回归语料见 test_ai_tool_routing.py。
-TOOL_ROUTING_ENABLED = settings.ai_tool_routing
+# 4. 总开关三态：AI_TOOL_ROUTING 未配置时按窗口自动（≥16384 关，<16384 开），
+#    显式 true/false 强制；语汇回归语料见 test_ai_tool_routing.py。
+def _routing_auto_enabled() -> bool:
+    """路由总开关：显式配置优先；未配置时按窗口自动判定。
+
+    裁剪的原始动机是 8K 窗口（schema 占 62%）；32768 下全量 schema 只占 ~16%，
+    继续裁的收益抵不上「语汇没命中 → 模型手里没这组工具」的失败模式，
+    默认只在窗口紧张（<16384）时启用。语汇回归见 test_ai_tool_routing.py。
+    """
+    if settings.ai_tool_routing is not None:
+        return settings.ai_tool_routing
+    return settings.ai_context_tokens < 16384
+
+
+TOOL_ROUTING_ENABLED = _routing_auto_enabled()
 
 KNOWLEDGE_TOOLS: tuple[str, ...] = (
     "search_training_methods", "recommend_training_methods",
@@ -322,7 +378,9 @@ def route_tool_schema(history: list[dict]) -> tuple[list[dict], str]:
 
 # ================================================================ 能力闸门（确定性，先于工具循环）
 # 提示词里的能力边界靠模型「自觉」，而 8B 并不总能自觉。这里用代码做确定性判断：
-# 命中即不进工具循环，直接走无工具收尾作答并注入指引；模型产出为空时用指引原文兜底。
+# 命中即把已判定的指引作为 system 注记注入本轮消息（BOUNDARY_NOTE_INSTRUCTION），
+# 常驻工具照常下发——混合请求（执行类 + 在域查询）里在域部分不至于被断粮陪葬；
+# 收尾请求仍禁用工具，模型始终不产出内容时直接把指引原文交给用户。
 #
 # 判定必须带「祈使信号」（请/帮我/怎么… 或 动词+一下）才算命中，否则会把
 # 「同步过来的数据」这类**在域描述**误判成同步请求。在域语料的零误伤回归见
@@ -582,11 +640,17 @@ def system_prompt(db: Session) -> str:
         vdot=vdot if vdot else "未知",
         goal_line=_goal_context_line(db, athlete.id),
         plan_line=_plan_context_line(db),
+        notes_line=_notes_context_line(db, athlete.id),
     )
 
 
-def chat_stream(db: Session, history: list[dict]) -> Iterator[dict]:
+def chat_stream(db: Session, history: list[dict], summary: str | None = None,
+                on_summary=None) -> Iterator[dict]:
     """执行一轮对话，产出事件流：{type: delta|tool|proposals|error|done}。
+
+    summary/on_summary：会话模式的滚动摘要（上下文压缩）。summary 为上一轮存好的
+    摘要，注入消息头部；历史超预算时被裁掉的旧段会压缩成新摘要并经 on_summary
+    回调持久化。无状态模式两者都传 None，退化为纯裁剪。
 
     契约：进程内任何终止路径（正常结束/错误/异常）都以 done 事件收尾。
     唯一例外是客户端断连：Starlette 关闭生成器时在 yield 点抛入 GeneratorExit，
@@ -594,7 +658,7 @@ def chat_stream(db: Session, history: list[dict]) -> Iterator[dict]:
     RuntimeError 并打进 ASGI 层，必须静默退出。
     """
     try:
-        yield from _chat_stream_impl(db, history)
+        yield from _chat_stream_impl(db, history, summary, on_summary)
     except GeneratorExit:
         raise
     else:
@@ -640,8 +704,11 @@ def _warn_ctx_overflow(total: int, budget: int, tools_tokens: int) -> None:
     _ctx_overflow_warned = True
 
 
-def _trim_context(msgs: list[dict], budget: int) -> int:
+def _trim_context(msgs: list[dict], budget: int,
+                  dropped_out: list[dict] | None = None) -> int:
     """把 msgs 压回 budget（token）内，返回丢弃的段数（0 = 未裁剪）。
+
+    dropped_out 非空时，被裁掉的消息原样收集进去（供滚动摘要使用）。
 
     两条不变量：
     1. 每个 role=tool 的消息必须紧跟在携带同 id tool_calls 的 assistant 之后
@@ -667,6 +734,8 @@ def _trim_context(msgs: list[dict], budget: int) -> int:
             _warn_ctx_overflow(_msgs_tokens(msgs), budget, TOOLS_SCHEMA_TOKENS)
             break
         end = next((s for s in starts if s > target), len(msgs))
+        if dropped_out is not None:
+            dropped_out.extend(msgs[target:end])
         del msgs[target:end]
         dropped += 1
     return dropped
@@ -736,6 +805,76 @@ def _stream_once(client, base: str, model_id: str, msgs: list[dict],
             "tool_calls": tool_calls, "error": None}
 
 
+# ---------------------------------------------------------------- 上下文压缩（滚动摘要）
+# 长会话的旧历史此前只能被 _trim_context 整段丢弃（「截断即遗忘」）。这里改成
+# 「摘要回收」：将被裁掉的旧段先压缩成要点，存进会话（ai_conversations.summary），
+# 下一轮从消息头部注入。摘要是优化不是硬依赖——压缩失败退化为纯裁剪。
+
+SUMMARY_PROMPT = """你在为一位跑者的 AI 教练压缩过往对话，产出供后续对话使用的记忆摘要。
+只保留对教练有持续价值的信息：用户的事实（伤病史/目标/偏好/生活节奏/装备/成绩）、已达成的决定或共识、未解决的待办；丢弃寒暄、重复与一次性内容。
+输出不超过 200 字的中文要点，可用分号分隔，不要评论、不要编号。
+若下方「更早的摘要」非空，把其中仍然有效的要点合并进新摘要。
+更早的摘要：{old_summary}"""
+
+SUMMARY_HEADER = "【此前对话的要点摘要（更早的细节已省略）】\n"
+
+
+def summarize_dialogue(dialog: str, old_summary: str = "") -> str | None:
+    """调用本地模型把对话片段压缩成滚动摘要。失败返回 None。"""
+    base = settings.ai_base_url.rstrip("/")
+    if validate_base_url(base):
+        return None
+    try:
+        r = httpx.post(
+            f"{base}/chat/completions",
+            json={"model": _effective_model(probe_cached()["models"]), "stream": False,
+                  "think": False, "temperature": 0.2,
+                  "messages": [{"role": "system",
+                                "content": SUMMARY_PROMPT.format(old_summary=old_summary or "（无）")},
+                               {"role": "user", "content": dialog[:6000]}]},
+            headers=_auth_headers(),
+            timeout=httpx.Timeout(settings.ai_timeout, connect=5.0),
+        )
+        r.raise_for_status()
+        content = _strip_think(r.json()["choices"][0]["message"]["content"] or "").strip()
+    except Exception as e:
+        logger.info("对话摘要生成失败，退化为纯裁剪：%s", e)
+        return None
+    return content[:400] or None
+
+
+def _compress_and_trim(msgs: list[dict], budget: int, summary: str | None,
+                       on_summary, client, base: str, model_id: str) -> int:
+    """进站时的摘要回收：历史超预算，先把将被裁掉的旧段压缩成滚动摘要，再裁剪。
+
+    只在进站时执行一次；工具轮内的裁剪针对的是本轮工具结果，不参与摘要。
+    on_summary 回调负责持久化（会话模式传存库闭包，无状态模式传 None 跳过）。
+    """
+    dropped: list[dict] = []
+    pre = _trim_context(msgs, budget, dropped_out=dropped)
+    if not pre:
+        return 0
+    logger.info("AI 历史超预算，回收 %d 段（当前 %d token）", pre, _msgs_tokens(msgs))
+    dialog = "\n".join(f"{m['role']}: {str(m.get('content') or '')[:300]}"
+                       for m in dropped if m.get("role") in ("user", "assistant"))
+    new_summary = summarize_dialogue(dialog[-6000:], old_summary=summary or "")
+    if not new_summary:
+        return pre
+    note = {"role": "system", "content": SUMMARY_HEADER + new_summary}
+    if len(msgs) > 1 and msgs[1].get("role") == "system" \
+            and str(msgs[1].get("content", "")).startswith(SUMMARY_HEADER):
+        msgs[1] = note          # 已有旧摘要：原地替换，不叠加
+    else:
+        msgs.insert(1, note)
+    if on_summary:
+        try:
+            on_summary(new_summary)
+        except Exception as e:
+            logger.warning("滚动摘要落库失败：%s", e)
+    _trim_context(msgs, budget)   # 注入摘要后再压一次，保证总量仍在预算内
+    return pre
+
+
 def _finalize_answer(client, base: str, model_id: str, msgs: list[dict],
                      hint: str | None = None) -> Generator[dict, None, str]:
     """禁用工具再请求一次，强制模型用已有信息作答。
@@ -753,7 +892,8 @@ def _finalize_answer(client, base: str, model_id: str, msgs: list[dict],
     return res["content"]
 
 
-def _chat_stream_impl(db: Session, history: list[dict]) -> Iterator[dict]:
+def _chat_stream_impl(db: Session, history: list[dict], summary: str | None = None,
+                      on_summary=None) -> Iterator[dict]:
     from .ai_tools import _get_athlete
     try:
         athlete = _get_athlete(db)
@@ -794,29 +934,19 @@ def _chat_stream_impl(db: Session, history: list[dict]) -> Iterator[dict]:
     logger.info("AI 工具集：%s（%d token / 全量 %d）；能力闸门：%s",
                 routing_note, tool_tokens, TOOLS_SCHEMA_TOKENS,
                 "命中" if scope_hint else "未命中")
-    # 首轮请求前就把历史压回预算：进站时只做了 [-24:] 切片 + 单条 4000 字符，
-    # 满编最坏 ~96K token 远超窗口（32K），第一次 _stream_once 就会把工具 schema 与系统提示词
-    # 从 prompt 头部挤掉（被 llama-server 静默丢弃）——正是本模块在工具轮内防御、
-    # 这里此前漏掉的同一失败模式。能力闸门与工具路由都管不到历史体积。
-    pre_dropped = _trim_context(msgs, budget)
-    if pre_dropped:
-        logger.info("AI 首轮历史超预算，已裁掉 %d 段（当前 %d token）",
-                    pre_dropped, _msgs_tokens(msgs))
     try:
         with httpx.Client(timeout=httpx.Timeout(settings.ai_timeout, connect=5.0)) as client:
-            if scope_hint:
-                # 能力外请求：一个工具都不给，直接用已判定的指引作答。
-                # 用户至少拿到「我做不到 + 该去哪儿做」，而不是空转 6 轮后的一句报错。
-                answer = yield from _finalize_answer(client, base, model_id, msgs, scope_hint)
-                if answer:
-                    return
-                # 模型连收尾都没能产出：直接把指引原文交给用户——
-                # 它本身就是完整可执行的回答，不该再降级成 error。
-                yield {"type": "delta", "text": scope_hint}
-                return
+            # 首轮请求前必须把历史压回预算（满编最坏 ~96K token 远超窗口 32K，不裁的话
+            # 第一次 _stream_once 就会把工具 schema 与系统提示词从 prompt 头部挤掉）。
+            # 裁剪前先做「摘要回收」：被裁掉的旧段压缩成滚动摘要注入头部并持久化。
+            _compress_and_trim(msgs, budget, summary, on_summary, client, base, model_id)
             seen_calls: set[str] = set()   # 已执行过的「工具+参数」指纹，用于拦截重复调用
             stale_rounds = 0               # 连续「零个新工具被调用」的轮数
             rounds_used = 0
+            if scope_hint:
+                # 能力外/混合请求：确定性指引注入本轮消息，常驻工具照常下发（见常量注释）。
+                msgs.append({"role": "system",
+                             "content": BOUNDARY_NOTE_INSTRUCTION.format(hint=scope_hint)})
             for _round in range(MAX_TOOL_ROUNDS):
                 rounds_used = _round + 1
                 res = yield from _stream_once(client, base, model_id, msgs, tools=tool_schema)
@@ -826,12 +956,13 @@ def _chat_stream_impl(db: Session, history: list[dict]) -> Iterator[dict]:
                 assistant_content, tool_calls = res["content"], res["tool_calls"]
 
                 if not tool_calls:
-                    # 模型给出最终回答，正常结束
+                    # 模型给出最终回答，正常结束；空答不急着报错，先让收尾通道再试一次
                     if proposals:
                         yield {"type": "proposals", "items": proposals}
-                    if not assistant_content:
-                        yield {"type": "error", "message": "模型没有返回内容，请重试或更换模型"}
-                    return
+                    if assistant_content:
+                        return
+                    logger.info("AI 第 %d 轮未产出工具调用与内容，进入收尾作答", rounds_used)
+                    break
 
                 # 执行工具轮
                 msgs.append({"role": "assistant",
@@ -887,14 +1018,22 @@ def _chat_stream_impl(db: Session, history: list[dict]) -> Iterator[dict]:
                     logger.info("AI 工具循环连续 %d 轮无新调用，提前收尾", stale_rounds)
                     break
 
-            # 走到这里 = 轮数用尽，或连续多轮只在重复刷工具。
+            # 走到这里 = 轮数用尽、停滞早停或空答。
             # 禁用工具做一次收尾作答：保证用户至少拿到一句人话（含能力边界说明 + 去哪手动做），
             # 而不是像旧版那样只吐一句「请换个问法」把锅甩回给用户。
             logger.info("AI 工具循环结束（已用 %d/%d 轮），进入收尾作答", rounds_used, MAX_TOOL_ROUNDS)
             if proposals:
                 yield {"type": "proposals", "items": proposals}
-            answer = yield from _finalize_answer(client, base, model_id, msgs)
+            # 能力闸门命中的轮次，收尾指令带上指引（若模型在循环里已答了在域部分，
+            # 走不到这里；走到这里说明模型始终没产出内容，指引就是最后的话）。
+            answer = yield from _finalize_answer(client, base, model_id, msgs,
+                                                 hint=scope_hint or None)
             if not answer:
+                if scope_hint:
+                    # 模型连收尾都没能产出：直接把指引原文交给用户——
+                    # 它本身就是完整可执行的回答，不该再降级成 error。
+                    yield {"type": "delta", "text": scope_hint}
+                    return
                 yield {"type": "error", "message": FINALIZE_FAILED_MSG}
     except httpx.ConnectError:
         yield {"type": "error", "message": "无法连接本地模型服务，请确认服务已启动（随平台启动会自动拉起）"}
@@ -910,7 +1049,7 @@ def _chat_stream_impl(db: Session, history: list[dict]) -> Iterator[dict]:
 EXTRACT_PROMPT = """你是参数提取器。从用户的自然语言目标中提取结构化字段，只输出一个 JSON 对象，不要解释。
 今天是 {today}。
 字段：
-- race_type: "5k"|"10k"|"hm"|"marathon"（hm=半程马拉松；马拉松/全马=marathon）
+- race_type: "800m"|"1k"|"1500m"|"3k"|"5k"|"10k"|"hm"|"marathon"（800米=800m、1000米/1公里=1k、1500米=1500m、3公里=3k；hm=半程马拉松；马拉松/全马=marathon）
 - target_time_sec: 整数秒（如"破三"=10800、"330"=全马3小时30分=12600、"50分钟"10k=3000）；无法确定则 null
 - target_date: "YYYY-MM-DD"（把"10月""下个月"等相对时间解析为具体日期，年份取未来最近的一个）；无法确定则 null
 - target_label: 简短中文标签（如"全马破三""杭马 330"）
@@ -950,8 +1089,8 @@ def extract_goal_params(text: str) -> dict:
     # 模型偶发返回数组/字符串：非 dict 直接按解析失败处理，而不是 AttributeError → 500
     if not isinstance(params, dict):
         raise ValueError("模型返回的参数格式异常，请换个说法描述目标")
-    if params.get("race_type") not in ("5k", "10k", "hm", "marathon"):
-        raise ValueError("没能识别出比赛项目（5k/10k/半马/全马），请明确一下")
+    if params.get("race_type") not in ai_tools.vdot.GOAL_RACE_TYPES:
+        raise ValueError("没能识别出比赛项目（800米～全马均可，如 800m/1k/5k/半马/全马），请明确一下")
     if params.get("target_time_sec") is not None:
         try:
             params["target_time_sec"] = int(params["target_time_sec"])
@@ -959,8 +1098,9 @@ def extract_goal_params(text: str) -> dict:
             # from None：底层是 int() 的报错文本，对用户没有信息量，
             # 真正要说的是下面这句格式提示
             raise ValueError("目标成绩格式无法识别，请直接写时间（如 3 小时 30 分）") from None
-        if not (600 <= params["target_time_sec"] <= 43200):
-            raise ValueError("目标成绩超出合理范围，请检查")
+        lo, hi = ai_tools._GOAL_TIME_RANGE[params["race_type"]]
+        if not (lo <= params["target_time_sec"] <= hi):
+            raise ValueError("目标成绩超出该项目的合理范围，请检查")
     if params.get("target_date"):
         try:
             _dt.date.fromisoformat(params["target_date"])

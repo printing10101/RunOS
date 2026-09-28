@@ -138,6 +138,7 @@ def _deltas(events: list[dict]) -> str:
 
 def test_repeat_tool_call_is_short_circuited(monkeypatch):
     """模型每一轮都重复同一个工具同一参数：只允许真正执行一次。"""
+    monkeypatch.setattr(ai_coach, "STALE_ROUND_LIMIT", 2)   # 本测试只关心短路，不关心停滞阈值
     same = [_tool_chunk("get_athlete_profile")]
     client = FakeClient(tool_rounds=[same, same, same], final=[_text_chunk("好的，我直接回答。")])
     events, executed = _run(monkeypatch, client)
@@ -151,7 +152,8 @@ def test_repeat_tool_call_is_short_circuited(monkeypatch):
 
 
 def test_stalled_rounds_stop_early(monkeypatch):
-    """连续两轮零新工具即提前收尾，不再把 6 轮全部烧完。"""
+    """连续两轮零新工具即提前收尾，不再把轮数全部烧完。"""
+    monkeypatch.setattr(ai_coach, "STALE_ROUND_LIMIT", 2)   # 钉住「连两轮停滞即收尾」的被测行为
     same = [_tool_chunk("get_athlete_profile")]
     client = FakeClient(tool_rounds=[same] * 6, final=[_text_chunk("收尾作答")])
     events, _ = _run(monkeypatch, client)
@@ -165,7 +167,8 @@ def test_stalled_rounds_stop_early(monkeypatch):
 # ---------------------------------------------------------------- 2. 触顶优雅降级
 
 def test_exhausted_rounds_still_produces_answer(monkeypatch):
-    """复现「同步高驰课表」原场景：6 轮全在扫不同工具 → 仍须给出人话。"""
+    """复现「同步高驰课表」原场景：轮数烧完仍须给出人话。"""
+    monkeypatch.setattr(ai_coach, "MAX_TOOL_ROUNDS", 6)     # 6 个不同工具正好耗尽轮数，与配置默认解耦
     scans = [[_tool_chunk(name, call_id=f"call_{i}")] for i, name in enumerate([
         "get_athlete_profile", "get_training_paces", "get_performance_prediction",
         "get_assessment", "get_recovery_status", "get_training_status"])]
