@@ -212,6 +212,9 @@ def ensure_ready() -> None:
 
     cmd = _server_cmd(bin_exe, model_path)
     logf = _log_file()
+    # llama-server 的 --log-file 是追加写、不带轮转：拉起前把超限的旧日志归档成 .old
+    from ..logging_config import rotate_big_log
+    rotate_big_log(logf)
     cmd += ["--log-file", str(logf)]   # 日志由 llama-server 自管，Python 不持有文件句柄
     try:
         _server_proc = subprocess.Popen(

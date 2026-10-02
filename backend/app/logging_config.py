@@ -28,15 +28,41 @@
 from __future__ import annotations
 
 import logging
+import logging.handlers
 import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 #: 出现即大概率是本项目代码缺陷的异常类型，详见模块 docstring。
 _SUSPECT_CODE_BUGS = (TypeError, AttributeError, NameError)
 
 _LOG_FORMAT = "%(asctime)s %(levelname)-7s [%(name)s] %(message)s"
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+# 文件日志轮转：本地应用常开数月，单文件无上限会把磁盘慢慢吃满。
+# 5MB × 3 份对 INFO 级别的单机日志足够回溯数周。
+_LOG_FILE_MAX_BYTES = 5 * 1024 * 1024
+_LOG_FILE_BACKUPS = 3
+_LOG_FILE = Path(__file__).resolve().parents[1] / "logs" / "runos.log"
+
+
+def rotate_big_log(path: Path, max_bytes: int = 10 * 1024 * 1024) -> None:
+    """超过 max_bytes 的追加写日志归档成 .old（只留一代）。
+
+    用于不经 Python logging 的日志：桌面壳重定向的 desktop-backend.log 与
+    llama-server 自写的 llama-server.log 都是「append 永不轮转」，靠调用方
+    在打开/拉起前归档一次。归档失败不抛——日志顶多继续变大，不该拦启动。
+    """
+    try:
+        if path.is_file() and path.stat().st_size > max_bytes:
+            old = path.with_suffix(path.suffix + ".old")
+            old.unlink(missing_ok=True)
+            path.rename(old)
+    except OSError as exc:
+        # 归档失败不拦启动：日志顶多继续变大。留痕不静默（全仓 except:pass 禁令）。
+        logging.getLogger(__name__).warning("归档日志失败（不拦启动）：%s，%s", path, exc)
+
 
 #: 幂等标记：重复调用不会叠加 handler（测试中多次 import 入口模块很常见）。
 _configured = False
@@ -56,12 +82,27 @@ def setup_logging(level: str = "INFO") -> None:
     if not isinstance(resolved, int):
         resolved = logging.INFO
 
+    fmt = logging.Formatter(fmt=_LOG_FORMAT, datefmt=_DATE_FORMAT)
     handler = logging.StreamHandler(sys.stdout)
-    handler.setFormatter(logging.Formatter(fmt=_LOG_FORMAT, datefmt=_DATE_FORMAT))
+    handler.setFormatter(fmt)
 
     root = logging.getLogger()
     root.setLevel(resolved)
     root.addHandler(handler)
+
+    # 文件日志（轮转）：桌面壳模式下 stdout 已重定向到 desktop-backend.log，
+    # 这里再落一份带轮转的，避免那份重定向文件无上限增长时连排错的记录都没了。
+    try:
+        _LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.handlers.RotatingFileHandler(
+            _LOG_FILE, maxBytes=_LOG_FILE_MAX_BYTES, backupCount=_LOG_FILE_BACKUPS,
+            encoding="utf-8")
+        file_handler.setFormatter(fmt)
+        root.addHandler(file_handler)
+    except OSError as exc:
+        # 只读目录/盘满等场景：文件日志降级缺席，控制台日志照常
+        print(f"[logging] 文件日志不可用（{exc}），仅输出到控制台", file=sys.stderr)
+
     _configured = True
 
 
@@ -78,6 +119,7 @@ def _reset_for_tests() -> None:
         if isinstance(h, logging.StreamHandler) and h.formatter \
                 and h.formatter._fmt == _LOG_FORMAT:
             root.removeHandler(h)
+            h.close()  # 摘掉 RotatingFileHandler 后不关会占着文件句柄
     _configured = False
 
 

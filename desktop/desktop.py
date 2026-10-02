@@ -30,6 +30,24 @@ SHUTDOWN_WAIT_S = 15.0
 CREATE_NO_WINDOW = 0x08000000  # 用控制台 python 调试时，拉起后端不闪黑窗
 ERROR_ALREADY_EXISTS = 183
 MB_ICONERROR = 0x10
+MAX_LOG_BYTES = 10 * 1024 * 1024  # desktop-backend.log 超过 10MB 归档成 .old（只留一代）
+
+
+def _rotate_backend_log() -> None:
+    """后端输出是 append 重定向、永不轮转：每次拉起前归档一次超限的旧日志。
+
+    归档失败不拦启动——顶多这份日志继续变大，比起不来服务强。
+    本文件刻意不 import 后端代码，轮转逻辑在此内联一份（与
+    app/logging_config.rotate_big_log 同语义）。
+    """
+    try:
+        if BACKEND_LOG.is_file() and BACKEND_LOG.stat().st_size > MAX_LOG_BYTES:
+            old = BACKEND_LOG.with_suffix(BACKEND_LOG.suffix + ".old")
+            if old.exists():
+                old.unlink()
+            BACKEND_LOG.rename(old)
+    except OSError:
+        pass
 
 
 def _request(method: str, path: str, timeout_s: float) -> int | None:
@@ -59,6 +77,7 @@ def wait_backend(timeout_s: float) -> bool:
 
 
 def spawn_backend() -> subprocess.Popen:
+    _rotate_backend_log()
     log = open(BACKEND_LOG, "a", encoding="utf-8")
     try:
         log.write(f"\n===== 桌面壳拉起后端 {datetime.now():%Y-%m-%d %H:%M:%S} =====\n")

@@ -96,7 +96,8 @@ def test_setup_logging_is_idempotent():
         setup_logging("INFO")
         after_first = len(root.handlers)
         setup_logging("DEBUG")
-        assert after_first == before + 1
+        # +2 = 控制台 stdout + 轮转文件日志（test_logging_rotation 锁文件侧）
+        assert after_first == before + 2
         assert len(root.handlers) == after_first
     finally:
         _reset_for_tests()
