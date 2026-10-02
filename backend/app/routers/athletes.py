@@ -6,7 +6,10 @@
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+import json
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -176,3 +179,79 @@ def delete_slot(slot_id: int, db: Session = Depends(get_db)):
     db.delete(s)
     db.commit()
     return {"ok": True}
+
+
+# ---------------------------------------------------------------- 数据导出
+
+# 导出包含的本人数据表（键 = 导出 JSON 的顶层字段名）。刻意排除：
+# · platform_connections.credentials 存第三方 token，凭据不属于导出物——
+#   连接本身只带元数据（platform/status/last_sync），方便在新环境重建绑定；
+# · app_settings / 方法库与模板表（training_methods 等）——应用配置与公共
+#   知识库，不是「你的训练数据」。
+# ORM 类白名单：与 models 一一对应，查询统一走各类的 athlete_id 外键（参数化）。
+_EXPORT_MODELS = (
+    ("goals", models.Goal), ("weekly_slots", models.WeeklySlot),
+    ("activities", models.Activity), ("gears", models.Gear),
+    ("race_results", models.RaceResult), ("race_predictions", models.RacePrediction),
+    ("daily_checkins", models.DailyCheckin), ("injury_logs", models.InjuryLog),
+    ("body_metrics", models.BodyMetric), ("weather_logs", models.WeatherLog),
+    ("fitness_snapshots", models.FitnessSnapshot), ("strength_tests", models.StrengthTest),
+    ("diet_logs", models.DietLog), ("training_plans", models.TrainingPlan),
+    ("plan_workouts", models.PlanWorkout),
+    ("ai_proposals", models.AiProposal), ("ai_conversations", models.AiConversation),
+    ("coach_notes", models.CoachNote), ("coach_briefs", models.CoachBrief),
+    ("assessments", models.Assessment),
+)
+
+
+def _row_dict(r) -> dict:
+    """一行 → JSON 安全的 dict：date/datetime 统一 isoformat，其余交给原生类型。"""
+    out = {}
+    for c in r.__table__.columns:
+        v = getattr(r, c.name)
+        if hasattr(v, "isoformat"):
+            v = v.isoformat()
+        out[c.name] = v
+    return out
+
+
+@router.get("/export")
+def export_all_data(db: Session = Depends(get_db)):
+    """全量导出本人全部训练数据（JSON 下载）——local-first 的数据所有权出口。
+
+    单文件快照涵盖训练/身体/计划/打卡/饮食/装备/伤病/环境/AI 记忆等全部
+    本人数据行，供迁移与留存；凭据类字段（平台 token）绝不入内。
+    """
+    a = _first(db)
+    if not a:
+        raise HTTPException(404, "还没有档案，先创建档案再导出")
+    aid = a.id
+    payload: dict = {
+        "exported_at": datetime.now().isoformat(timespec="seconds"),
+        "app": "RunOS", "schema_version": 1,
+        "athlete": _row_dict(a),
+        "platform_connections": [
+            {k: v for k, v in _row_dict(c).items() if k != "credentials"}
+            for c in db.scalars(select(models.PlatformConnection).where(
+                models.PlatformConnection.athlete_id == aid)).all()
+        ],
+    }
+    for name, mdl in _EXPORT_MODELS:
+        payload[name] = [_row_dict(r) for r in db.scalars(
+            select(mdl).where(mdl.athlete_id == aid)).all()]
+
+    # 传递归属的两张表：周挂在计划下、AI 消息挂在会话下——先取本人的父 id 再圈定，
+    # in_() 空列表是合法的空集（该板块导出为空数组）
+    plan_ids = db.scalars(select(models.TrainingPlan.id).where(
+        models.TrainingPlan.athlete_id == aid)).all()
+    payload["plan_weeks"] = [_row_dict(r) for r in db.scalars(
+        select(models.PlanWeek).where(models.PlanWeek.plan_id.in_(plan_ids))).all()]
+    conv_ids = db.scalars(select(models.AiConversation.id).where(
+        models.AiConversation.athlete_id == aid)).all()
+    payload["ai_messages"] = [_row_dict(r) for r in db.scalars(
+        select(models.AiMessage).where(models.AiMessage.conversation_id.in_(conv_ids))).all()]
+
+    body = json.dumps(payload, ensure_ascii=False, default=str)
+    filename = f"runos_export_{datetime.now():%Y%m%d_%H%M%S}.json"
+    return Response(content=body, media_type="application/json",
+                    headers={"Content-Disposition": f'attachment; filename="{filename}"'})

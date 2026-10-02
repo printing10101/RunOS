@@ -128,6 +128,28 @@
             <li>想让某个字段固定不动，把它的「自动推算」开关关掉即可。</li>
           </ol>
         </el-card>
+
+        <el-card shadow="never" style="margin-top:14px">
+          <template #header>
+            数据与备份
+            <span class="hdr-tip">每次启动自动快照，滚动保留最近 7 份</span>
+          </template>
+          <div class="backup-actions">
+            <el-button size="small" round :loading="exporting" @click="exportData">导出全部数据 (JSON)</el-button>
+            <el-button size="small" round :loading="backingUp" @click="runBackup">立即备份</el-button>
+          </div>
+          <div v-if="backupsError" class="field-tip" style="color:#e0805f">备份列表加载失败：{{ backupsError }}</div>
+          <el-empty v-else-if="!backups.length" description="还没有备份，点上面「立即备份」生成第一个还原点" :image-size="60" />
+          <div v-for="b in backups" :key="b.name" class="backup-row">
+            <span class="backup-time">{{ b.created_at.replace('T', ' ') }}</span>
+            <span class="backup-size">{{ b.size_mb }} MB</span>
+            <el-button size="small" text bg @click="downloadBackup(b.name)">下载</el-button>
+          </div>
+          <div class="field-tip" style="margin-top:10px">
+            恢复方法：关闭 RunOS → 用备份文件覆盖 backend/sport_platform.db → 重新打开。
+            备份默认与数据库同盘，建议在 backend/.env 设 BACKUP_DIR 指到另一块盘或网盘目录。
+          </div>
+        </el-card>
       </el-col>
     </el-row>
   </div>
@@ -179,6 +201,7 @@ const rules = {
 }
 
 onMounted(load)
+onMounted(loadBackups)
 async function load() {
   const d = await api.get('/athlete')
   Object.keys(form).forEach(k => { form[k] = null })
@@ -304,6 +327,66 @@ async function delGoal(id) {
   ElMessage.success('已删除')
   await load()
 }
+
+// ---------------------------------------------------------------- 数据与备份
+
+const backups = ref([])
+const backupsError = ref('')
+const backingUp = ref(false)
+const exporting = ref(false)
+
+async function loadBackups() {
+  backupsError.value = ''
+  try {
+    backups.value = (await api.get('/system/backups')).items || []
+  } catch (e) {
+    backupsError.value = e.message || '未知错误'
+  }
+}
+
+async function runBackup() {
+  backingUp.value = true
+  try {
+    await api.post('/system/backups')
+    ElMessage.success('已生成备份还原点')
+    await loadBackups()
+  } catch (e) {
+    ElMessage.error(e.message || '备份失败')
+  } finally { backingUp.value = false }
+}
+
+// 下载走 fetch+blob：桌面壳（WebView2）里 window.open 触发的下载体验不可控
+async function _downloadFile(url, filename) {
+  const resp = await fetch(url)
+  if (!resp.ok) {
+    let detail = ''
+    try { detail = (await resp.json()).detail || '' } catch { /* 非 JSON 错误体 */ }
+    throw new Error(detail || `下载失败（${resp.status}）`)
+  }
+  const blob = await resp.blob()
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(blob)
+  link.download = filename
+  link.click()
+  URL.revokeObjectURL(link.href)
+}
+
+async function downloadBackup(name) {
+  try {
+    await _downloadFile(`/api/system/backups/${encodeURIComponent(name)}/download`, name)
+  } catch (e) { ElMessage.error(e.message || '下载失败') }
+}
+
+async function exportData() {
+  exporting.value = true
+  try {
+    const name = `runos_export_${new Date().toISOString().slice(0, 10)}.json`
+    await _downloadFile('/api/athlete/export', name)
+    ElMessage.success('已导出全部训练数据')
+  } catch (e) {
+    ElMessage.error(e.message || '导出失败')
+  } finally { exporting.value = false }
+}
 </script>
 
 <style scoped>
@@ -334,4 +417,9 @@ async function delGoal(id) {
 .ring-fill { stroke: var(--blue); stroke-width: 3.2; stroke-linecap: round; transition: stroke-dasharray .6s ease; }
 .goal-ring.done .ring-fill { stroke: #d4b06a; }
 .next-steps { font-size: 13px; color: var(--text-2); line-height: 2; padding-left: 18px; margin: 10px 0 0; }
+.backup-actions { display: flex; gap: 8px; margin-bottom: 10px; }
+.backup-row { display: flex; align-items: center; gap: 10px; padding: 7px 0;
+              border-bottom: 1px dashed rgba(157,184,173,.12); font-size: 12px; }
+.backup-time { flex: 1; color: var(--text-2); }
+.backup-size { color: var(--text-3); }
 </style>

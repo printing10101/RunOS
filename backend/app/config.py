@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     # 间隔下限见 services/syncer.py。
     auto_sync_minutes: int = 30
 
+    # 数据库备份目录（services/backup.py）。留空 = 与库文件同级（backend/backups/）；
+    # 建议指到另一块盘或网盘同步目录——同盘备份扛不住盘坏。
+    backup_dir: str = ""
+
     model_config = {"env_file": BASE_DIR / ".env", "extra": "ignore"}
 
     @property

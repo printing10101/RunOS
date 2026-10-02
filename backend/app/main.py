@@ -30,6 +30,7 @@ from .routers import (
     races,
     stats,
     strength,
+    system,
     training_status,
 )
 from .security import CsrfGuardMiddleware
@@ -47,6 +48,13 @@ WEB_DIST_ROOT = WEB_DIST.resolve()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # 启动即做一次在线快照（滚动保留最近 7 份，目录可由 BACKUP_DIR 指到另一块盘）。
+    # 尽力而为：备份通道出问题只记日志，不阻断平台启动——下次启动会再试。
+    from .services import backup
+    try:
+        backup.backup_db()
+    except Exception:
+        logger.warning("启动备份失败（不阻断启动，下次启动重试）", exc_info=True)
     # 自动同步调度（高驰 MCP 无 webhook，定时增量拉取即「实时更新」）
     from .services import syncer
     syncer.start_scheduler()
@@ -93,6 +101,7 @@ app.include_router(races.router)
 app.include_router(checkin.router)
 app.include_router(ai.router)
 app.include_router(methods.router)
+app.include_router(system.router)
 
 
 @app.get("/api/health")

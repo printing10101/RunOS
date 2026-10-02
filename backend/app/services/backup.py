@@ -3,8 +3,8 @@
 设计要点：
 - 用 sqlite3 的 backup API（而不是直接拷文件）：即使有未 checkpoint 的 WAL
   事务，也能拿到一致性快照，不会拷出半截库；
-- 备份目录与库文件同级（backend/backups/），跟数据放在一起，随项目目录一起被
-  用户备份/迁移；文件名带时间戳，可直观看到每次备份时间；
+- 备份目录默认与库文件同级（backend/backups/），可用 settings.backup_dir
+  （backend/.env 的 BACKUP_DIR）指到另一块盘或网盘同步目录——同盘备份扛不住盘坏；文件名带时间戳，可直观看到每次备份时间；
 - 尽力而为：任何失败只记日志，不阻断启动（调用方在 lifespan 里再兜一层）。
 """
 from __future__ import annotations
@@ -32,14 +32,25 @@ def _db_path() -> Path | None:
     return Path(raw)
 
 
+def backups_dir() -> Path | None:
+    """备份根目录：settings.backup_dir 优先（可指到另一块盘/网盘同步目录），
+    缺省与库文件同级（backend/backups/）。未用 SQLite 返回 None。"""
+    if settings.backup_dir.strip():
+        return Path(settings.backup_dir.strip())
+    db_path = _db_path()
+    if db_path is None:
+        return None
+    return db_path.parent / "backups"
+
+
 def backup_db() -> Path | None:
     """执行一次备份，返回备份文件路径；无需备份/失败返回 None。"""
     db_path = _db_path()
-    if db_path is None or not db_path.is_file():
+    dest_dir = backups_dir()
+    if db_path is None or not db_path.is_file() or dest_dir is None:
         logger.info("跳过数据库备份：未找到 SQLite 库文件（%s）", db_path)
         return None
 
-    dest_dir = db_path.parent / "backups"
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / f"{PREFIX}{time.strftime('%Y%m%d_%H%M%S')}.db"
 
@@ -69,11 +80,8 @@ def backup_db() -> Path | None:
 
 
 def list_backups() -> list[Path]:
-    """按时间倒序列出现存备份文件（供设置页展示；目录不存在时返回空）。"""
-    db_path = _db_path()
-    if db_path is None:
-        return []
-    dest_dir = db_path.parent / "backups"
-    if not dest_dir.is_dir():
+    """按时间倒序列出现存备份文件（设置区展示；目录不存在时返回空）。"""
+    dest_dir = backups_dir()
+    if dest_dir is None or not dest_dir.is_dir():
         return []
     return sorted(dest_dir.glob(f"{PREFIX}*.db"), reverse=True)
