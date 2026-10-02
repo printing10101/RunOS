@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from .. import models
 from ..data import get_default_athlete
 from .vocab import session_label
+from .planner import week_start
 
 # 疑问/请求信号：出现即不走直通（这些需要 LLM 的推理或工具循环）
 _QUESTION_MARKS = ("如何", "怎么", "为什么", "为何", "吗", "请", "帮我",
@@ -91,7 +92,7 @@ def _today(db: Session) -> str:
 
 def _week_rows(db: Session, athlete_id: int) -> list[models.PlanWorkout]:
     today = date.today()
-    monday = today - timedelta(days=today.weekday())
+    monday = week_start(today)
     return db.scalars(select(models.PlanWorkout).where(
         models.PlanWorkout.athlete_id == athlete_id,
         models.PlanWorkout.date >= monday,

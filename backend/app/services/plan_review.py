@@ -13,12 +13,10 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models
-from ..config import settings
 from ..data import active_plan, build_evaluation, get_default_athlete, planned_workouts
 from . import ai_coach, review_guard
 from .vocab import is_hard_or_long
@@ -130,29 +128,8 @@ def _training_status(db: Session, athlete):
 
 def generate_text(facts: dict) -> str:
     """调用本地模型写课表分析。失败抛 ValueError（调用方转规则兜底）。"""
-    base = settings.ai_base_url.rstrip("/")
-    bad = ai_coach.validate_base_url(base)
-    if bad:
-        raise ValueError(bad)
     prompt = REVIEW_PROMPT.format(today=date.today().isoformat(), **facts)
-    try:
-        r = httpx.post(
-            f"{base}/chat/completions",
-            json={"model": ai_coach.review_model_id(ai_coach.probe_cached()["models"]),
-                  "stream": False, "temperature": 0.5,
-                  **ai_coach.review_gen_kwargs(MAX_REVIEW_TOKENS),
-                  "messages": [{"role": "user", "content": prompt}]},
-            headers=ai_coach._auth_headers(),
-            timeout=httpx.Timeout(ai_coach.review_timeout(), connect=5.0),
-        )
-        r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"] or ""
-    except Exception as e:
-        raise ValueError(f"本地模型不可用：{e}") from e
-    text = ai_coach._strip_think(content).strip()
-    if not text:
-        raise ValueError("模型没有返回内容")
-    return text
+    return ai_coach.complete_text(prompt, max_tokens=MAX_REVIEW_TOKENS)
 
 
 def fallback_review(facts: dict) -> str:

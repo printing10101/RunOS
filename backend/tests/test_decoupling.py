@@ -133,6 +133,28 @@ def _fresh_db():
     return sessionmaker(bind=engine)()
 
 
+def test_zone_prev_window_excludes_current():
+    """「前 28 天对照」必须是 (28, 56] 天的窗口，不得混入当前 28 天。
+
+    回归锁定：window_secs 曾只按下界裁剪，prev=window(56) 把当前 28 天也算了
+    进去——基线被当期稀释，对照结论系统性偏乐观。构造两段设备区间精确可控的
+    活动：当期全 Z1、前期全 Z5，则前 28 天 easy 占比必须是 0%（混入当期则是 50%）。"""
+    from app.services.pro_insights import _zone_distribution_insight
+
+    now = datetime.now()
+
+    def _run(days_ago, zones):
+        return {"sport": "run", "start_time": now - timedelta(days=days_ago),
+                "duration_sec": 3600, "distance_m": 9000, "elevation_m": 0, "avg_hr": 150,
+                "raw": {"hr_zones": zones}}
+
+    athlete = {"max_hr": 190, "resting_hr": 55}
+    ins = _zone_distribution_insight(
+        [_run(5, {"Z1": 3600}), _run(35, {"Z5": 3600})], athlete, now)
+    assert ins["available"] is True
+    assert "前 28 天（0%）对照" in ins["evidence"][2], ins["evidence"][2]
+
+
 def test_pro_insights_endpoint_smoke():
     """端点已接线（此前 build_pro_insights 全仓零调用）：无设备数据时
     返回结构并明确声明不可用，而不是报错或编造数值。"""

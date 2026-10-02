@@ -10,21 +10,18 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-import httpx
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models
-from ..config import settings
-from ..data import activities_dicts, build_prediction, riegel_calibration, weekly_km
+from ..data import active_goal, activities_dicts, build_prediction, riegel_calibration, weekly_km
 from . import ai_coach, review_guard, vdot
 
 logger = logging.getLogger(__name__)
 
 MAX_REVIEW_TOKENS = 480
 
-PREDICT_LABELS = {"800m": "800米", "1500m": "1500米", "3k": "3公里",
-                  "5k": "5公里", "10k": "10公里", "hm": "半马", "marathon": "全马"}
+# 比赛中文名直接用 vdot.RACE_LABELS 单源（本地副本曾漏 1k，预测解读回退显示原始键）
+PREDICT_LABELS = vdot.RACE_LABELS
 
 REVIEW_PROMPT = """你是跑者的专属 AI 教练。以下是平台引擎算出的成绩预测事实（今天是 {today}），请写一段解读。
 
@@ -60,8 +57,7 @@ def gather_facts(db: Session, athlete: models.Athlete) -> dict:
     cs = pred.critical_speed
     cs_line = f"{round(cs, 2)} m/s" if cs else "数据不足（需多距离成绩拟合）"
 
-    goal = db.scalar(select(models.Goal).where(
-        models.Goal.athlete_id == athlete.id, models.Goal.status == "active").order_by(models.Goal.id))
+    goal = active_goal(db, athlete.id)
     goal_line = "未设活动目标"
     if goal:
         label = PREDICT_LABELS.get(goal.race_type, goal.race_type)
@@ -93,29 +89,8 @@ def gather_facts(db: Session, athlete: models.Athlete) -> dict:
 
 def generate_text(facts: dict) -> str:
     """调用本地模型写预测解读。失败抛 ValueError（调用方转规则兜底或报错）。"""
-    base = settings.ai_base_url.rstrip("/")
-    bad = ai_coach.validate_base_url(base)
-    if bad:
-        raise ValueError(bad)
     prompt = REVIEW_PROMPT.format(today=date.today().isoformat(), **facts)
-    try:
-        r = httpx.post(
-            f"{base}/chat/completions",
-            json={"model": ai_coach.review_model_id(ai_coach.probe_cached()["models"]),
-                  "stream": False, "temperature": 0.5,
-                  **ai_coach.review_gen_kwargs(MAX_REVIEW_TOKENS),
-                  "messages": [{"role": "user", "content": prompt}]},
-            headers=ai_coach._auth_headers(),
-            timeout=httpx.Timeout(ai_coach.review_timeout(), connect=5.0),
-        )
-        r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"] or ""
-    except Exception as e:
-        raise ValueError(f"本地模型不可用：{e}") from e
-    text = ai_coach._strip_think(content).strip()
-    if not text:
-        raise ValueError("模型没有返回内容")
-    return text
+    return ai_coach.complete_text(prompt, max_tokens=MAX_REVIEW_TOKENS)
 
 
 def fallback_review(facts: dict) -> str:

@@ -9,13 +9,15 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import models
 from ..data import (
+    active_goal,
     active_plan,
     activities_dicts,
     athlete_dict,
@@ -31,13 +33,32 @@ from ..data import (
     weekly_km,
 )
 from ..logging_config import get_logger
-from . import evaluator, planner, vdot, zones
+from ..schemas import ExploreQueryIn
+from . import evaluator, explore, planner, vdot, zones
 from . import strength as strength_svc
-from .vocab import is_hard_or_long
-
-WEEKDAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+from .vocab import WEEKDAY_CN, is_hard_or_long
 
 logger = get_logger(__name__)
+
+
+def _query_data_description() -> str:
+    """从探索引擎注册表动态生成工具说明：表/维度/指标永不与引擎漂移。"""
+    lines = ["对本地训练数据做跨记录的分组聚合统计，返回引擎算出的确定性数字。"
+             "『周几跑量最多』『哪个月平均心率最高』『各运动类型总距离』这类整体统计问题必用；"
+             "逐次明细用 get_training_history，单次深入分析用 get_activity_detail。可用表："]
+    for key, t in explore.TABLES.items():
+        dims = []
+        for d in t["dims"]:
+            if d.get("labels"):
+                dims.append(f"{d['key']}({'/'.join(str(k) for k in d['labels'])})")
+            else:
+                dims.append(d["key"])
+        measures = [m for m, _ in t["measures"]]
+        lines.append(f"{key}({t['label']})：维度 {'、'.join(dims) if dims else '无'}"
+                     f"+日期粒度 day/month/weekday；指标 {'、'.join(measures) if measures else '无(仅记录数)'}")
+    lines.append("agg 取 count/sum/avg/min/max，记录数用 col=\"*\"+agg=\"count\"；"
+                 "weekday 的值 0=周日~6=周六。列名写错时错误信息会列出可用项，照着改参数重试即可。")
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------- 工具 schema（OpenAI function calling 格式）
@@ -106,6 +127,30 @@ TOOLS_SCHEMA: list[dict] = [
             "activity_id": {"type": "integer", "description": "活动 id（来自 get_training_history）"},
             "date": {"type": "string", "description": "或直接给日期 YYYY-MM-DD；当天有多节跑步时全部返回"},
         }, "required": []},
+    }},
+    {"type": "function", "function": {
+        "name": "query_data",
+        "description": _query_data_description(),
+        "parameters": {"type": "object", "properties": {
+            "table": {"type": "string", "enum": list(explore.TABLES), "description": "数据表"},
+            "group_by": {"type": "array", "items": {"type": "string"}, "maxItems": 2,
+                         "description": "分组维度（可含 day/month/weekday），不传=整体合计一行"},
+            "metrics": {"type": "array", "minItems": 1, "maxItems": 6, "items": {
+                "type": "object",
+                "properties": {"col": {"type": "string"}, "agg": {"type": "string"}},
+                "required": ["col", "agg"]},
+                "description": "指标列表，如 [{\"col\":\"distance_m\",\"agg\":\"sum\"}]"},
+            "filters": {"type": "array", "maxItems": 6, "items": {
+                "type": "object",
+                "properties": {"col": {"type": "string"},
+                               "op": {"type": "string",
+                                      "enum": ["eq", "ne", "gt", "ge", "lt", "le", "like"]},
+                               "value": {}},
+                "required": ["col", "op", "value"]}},
+            "date_from": {"type": "string", "description": "YYYY-MM-DD，可选"},
+            "date_to": {"type": "string", "description": "YYYY-MM-DD（含当天），可选"},
+            "limit": {"type": "integer", "description": "返回行数上限，默认 50"},
+        }, "required": ["table", "metrics"]},
     }},
     {"type": "function", "function": {
         "name": "get_this_week_workouts",
@@ -264,7 +309,7 @@ TOOLS_SCHEMA: list[dict] = [
     }},
     {"type": "function", "function": {
         "name": "search_training_methods",
-        "description": "检索训练方法知识库（含日本/亚洲体系：慢跑法、川内式、箱根驿传、实业团、大迫杰体系、日式课型ペース走/BUP/距离走/流し/ナンバ跑姿等，以及全球流派：挪威双阈值、极化 80/20、金字塔、汉森、Canova、Lydiard、MAF、东非）。每条含出处与证据等级。用户问『有哪些训练方法/日本怎么练/XX 流派是什么』时必用，不要凭记忆回答训练法。",
+        "description": "检索训练方法知识库（含日本/亚洲体系：慢跑法、川内式、箱根驿传、实业团、大迫杰体系、日式课型ペース走/BUP/距离走/流し/ナンバ跑姿等，以及全球流派：挪威双阈值、极化 80/20、金字塔、汉森、Canova、Lydiard、MAF、东非、法特莱克、亚索800、Hudson 自适应、FIRST 三课制、Pfitzinger、Galloway 走跑法）。每条含出处与证据等级。用户问『有哪些训练方法/日本怎么练/XX 流派是什么』时必用，不要凭记忆回答训练法。",
         "parameters": {"type": "object", "properties": {
             "origin": {"type": "string", "enum": ["japan", "asia", "western", "global"], "description": "按来源地区过滤"},
             "level": {"type": "string", "enum": ["beginner", "intermediate", "advanced", "elite"], "description": "按适用水平过滤"},
@@ -293,7 +338,7 @@ TOOLS_SCHEMA: list[dict] = [
     }},
     {"type": "function", "function": {
         "name": "search_training_principles",
-        "description": "检索训练原理库（负荷管理/强度分布/阈值/减量/力量/补糖/睡眠恢复/步频/专项化等 12 条，含机制、可执行规则、平台已落地位置与文献出处）。用户问『为什么这么练/有没有科学依据』，或你在定制/调整训练计划需要说明决策依据时必用——给计划每个关键决策引用对应原理的 practical_rules，做到有迹可循。",
+        "description": "检索训练原理库（负荷管理/强度分布/阈值/减量/力量/补糖/水合与钠/咖啡因/糖原负荷/骨应力预防/睡眠恢复/步频等，含机制、可执行规则、平台已落地位置与文献出处）。用户问『为什么这么练/有没有科学依据』，或你在定制/调整训练计划需要说明决策依据时必用——给计划每个关键决策引用对应原理的 practical_rules，做到有迹可循。",
         "parameters": {"type": "object", "properties": {
             "category": {"type": "string", "description": "load/intensity/recovery/periodization/specificity/strength/nutrition/technique"},
             "q": {"type": "string", "description": "关键词，如 减量/ACWR/力量/补糖/步频"},
@@ -301,7 +346,7 @@ TOOLS_SCHEMA: list[dict] = [
     }},
     {"type": "function", "function": {
         "name": "recommend_training_plans",
-        "description": "按跑者画像从参考计划库（C25K/Higdon/FIRST/Hanson/Pfitzinger/Daniels 2Q/Galloway/业余阈值块等 10 个）匹配训练计划骨架，返回命中理由、周模板、长距离递进、关键课、减量方案与出处。用户要『帮我定一个训练计划』时必用：以此为骨架参照 + 结合 search_training_principles 的原理 + 用户真实 VDOT/日程做个性化，并明确说明参照了哪个计划、依据了哪些原理；不要凭空发明结构。",
+        "description": "按跑者画像从参考计划库（C25K/Higdon 5k/Higdon 半马中级/Higdon 全马中级/Higdon 新手全马/FIRST/Hanson/Pfitzinger 18-55/18-70/Daniels 2Q/Galloway/业余阈值块等 13 个）匹配训练计划骨架，返回命中理由、周模板、长距离递进、关键课、减量方案与出处。用户要『帮我定一个训练计划』时必用：以此为骨架参照 + 结合 search_training_principles 的原理 + 用户真实 VDOT/日程做个性化，并明确说明参照了哪个计划、依据了哪些原理；不要凭空发明结构。",
         "parameters": {"type": "object", "properties": {}, "required": []},
     }},
     {"type": "function", "function": {
@@ -329,6 +374,7 @@ TOOL_LABELS = {
     "get_recent_training": "查询近期训练",
     "get_training_history": "查询逐次训练记录",
     "get_activity_detail": "查询单次训练明细",
+    "query_data": "跨记录统计查询",
     "get_this_week_workouts": "查询本周课表",
     "get_plan_overview": "查询计划概览",
     "get_diet_status": "查询饮食状态",
@@ -405,7 +451,7 @@ def _steps_summary(structured: list[dict]) -> str:
 def _workout_dict(wo: models.PlanWorkout, with_steps: bool = True) -> dict:
     return {
         "workout_id": wo.id, "date": wo.date.isoformat(), "weekday": wo.date.weekday(),
-        "weekday_name": WEEKDAY_NAMES[wo.date.weekday()],
+        "weekday_name": WEEKDAY_CN[wo.date.weekday()],
         "start_time": wo.start_time, "session_type": wo.session_type, "title": wo.title,
         "distance_km": wo.distance_km, "duration_min": wo.duration_min,
         "status": wo.status,
@@ -416,8 +462,7 @@ def _workout_dict(wo: models.PlanWorkout, with_steps: bool = True) -> dict:
 # ---- 数据类工具 ----
 
 def _t_profile(db: Session, athlete: models.Athlete, args: dict) -> dict:
-    goal = db.scalar(select(models.Goal).where(
-        models.Goal.athlete_id == athlete.id, models.Goal.status == "active").order_by(models.Goal.id))
+    goal = active_goal(db, athlete.id)
     acts = activities_dicts(db, athlete.id, days=28)
     return {
         "profile": athlete_dict(athlete),
@@ -485,9 +530,11 @@ def _t_recent_training(db: Session, athlete: models.Athlete, args: dict) -> dict
     total_km = sum(a["distance_m"] for a in runs) / 1000
     total_min = sum(a["duration_sec"] for a in runs) / 60
     pace = (total_min / total_km) if total_km > 0 else None   # min/km
-    # 近 28/56 天窗口从最大窗口结果切片复用，避免一次调用查三遍库
+    # 近 28/56 天窗口从最大窗口结果切片复用，避免一次调用查两遍库；
+    # _28d 字段必须真的只算 28 天（zones 不做内部窗口，喂 56 天就统计 56 天）
     wide = activities_dicts(db, athlete.id, days=56)
-    acts28 = wide if days >= 28 else activities_dicts(db, athlete.id, days=28)
+    cut28 = (datetime.now() - timedelta(days=28)).date().isoformat()
+    acts28 = [a for a in wide if a["start_time"].date().isoformat() >= cut28]
     return {
         "days": days, "run_count": len(runs),
         "total_km": round(total_km, 1), "total_min": round(total_min),
@@ -566,6 +613,8 @@ def _t_activity_detail(db: Session, athlete: models.Athlete, args: dict) -> dict
             "avg_power": a.avg_power, "elevation_m": a.elevation_m,
             "calories": a.calories, "rpe": a.rpe, "te_aerobic": a.te_aerobic,
             "te_anaerobic": a.te_anaerobic, "effort_score": a.effort_score,
+            # 活动级教练点评（未关联课表课的活动也有；关联课的点评在 linked_workout 里）
+            "coach_comment": a.coach_comment or None,
             # 设备原始明细（分段/心率区间/跑姿，键随平台而异），结果超长由循环侧统一截断
             "dynamics": a.dynamics or {}, "raw": a.raw or {},
         }
@@ -588,17 +637,15 @@ def _t_this_week(db: Session, athlete: models.Athlete, args: dict) -> dict:
     week = next((w for w in plan.weeks if w.start_date <= today < w.start_date + timedelta(days=7)), None)
     if not week:
         return {"has_plan": False, "hint": f"计划 {plan.start_date.isoformat()}~{plan.race_date.isoformat()} 不覆盖本周"}
-    today_wd = today.weekday()
     return {
         "has_plan": True, "plan_name": plan.name,
         "week_index": week.week_index, "phase": week.phase, "focus": week.focus,
         "week_target_km": week.target_km,
         "today": today.isoformat(),
         "workouts": [_workout_dict(wo) for wo in week.workouts],
-        "rest_days": [WEEKDAY_NAMES[d] for d in range(7)
-                      if not any(wo.date.weekday() == d for wo in week.workouts) and d >= 0],
+        "rest_days": [WEEKDAY_CN[d] for d in range(7)
+                      if not any(wo.date.weekday() == d for wo in week.workouts)],
         "note_past_days": "今天的日期是 " + today.isoformat() + "，早于今天的课只能作为历史参考",
-        "_today_weekday": today_wd,
     }
 
 
@@ -636,7 +683,7 @@ def _t_diet(db: Session, athlete: models.Athlete, args: dict) -> dict:
 def _t_slots(db: Session, athlete: models.Athlete, args: dict) -> dict:
     rows = db.scalars(select(models.WeeklySlot).where(
         models.WeeklySlot.athlete_id == athlete.id).order_by(models.WeeklySlot.weekday)).all()
-    return {"slots": [{"weekday": s.weekday, "weekday_name": WEEKDAY_NAMES[s.weekday],
+    return {"slots": [{"weekday": s.weekday, "weekday_name": WEEKDAY_CN[s.weekday],
                        "start_time": s.start_time, "duration_minutes": s.duration_minutes,
                        "kind": s.kind, "label": s.label} for s in rows]}
 
@@ -649,10 +696,6 @@ def _t_strength(db: Session, athlete: models.Athlete, args: dict) -> dict:
 
 # ---- 提议类工具（校验 + 预览，不落库） ----
 
-def _week_of(wo: models.PlanWorkout) -> models.PlanWeek:
-    return wo.week
-
-
 def check_move(db: Session, athlete: models.Athlete, workout_id: int, target_weekday: int) -> dict:
     """挪课校验。返回 {ok, proposal|reasons, warnings}。应用端点复用同一函数。"""
     wo = db.get(models.PlanWorkout, workout_id)
@@ -663,7 +706,7 @@ def check_move(db: Session, athlete: models.Athlete, workout_id: int, target_wee
     if not (0 <= target_weekday <= 6):
         return {"ok": False, "reasons": ["target_weekday 必须在 0-6"]}
 
-    week = _week_of(wo)
+    week = wo.week
     new_date = week.start_date + timedelta(days=target_weekday)
     reasons, warnings = [], []
 
@@ -680,7 +723,7 @@ def check_move(db: Session, athlete: models.Athlete, workout_id: int, target_wee
     # 时段是否放得下
     slots = [s for s in active_slots(db, athlete.id) if s["weekday"] == target_weekday]
     if not slots:
-        reasons.append(f"{WEEKDAY_NAMES[target_weekday]}没有可训练时段（日程管理中该日无 available 空档）")
+        reasons.append(f"{WEEKDAY_CN[target_weekday]}没有可训练时段（日程管理中该日无 available 空档）")
     else:
         best = max(s["duration_minutes"] for s in slots)
         need = wo.duration_min * 0.85
@@ -702,8 +745,8 @@ def check_move(db: Session, athlete: models.Athlete, workout_id: int, target_wee
 
     return {"ok": True, "warnings": warnings, "proposal": {
         "kind": "move_workout",
-        "title": f"把「{wo.title}」从 {wo.date.isoformat()}（{WEEKDAY_NAMES[wo.date.weekday()]}）挪到 "
-                 f"{new_date.isoformat()}（{WEEKDAY_NAMES[target_weekday]}）",
+        "title": f"把「{wo.title}」从 {wo.date.isoformat()}（{WEEKDAY_CN[wo.date.weekday()]}）挪到 "
+                 f"{new_date.isoformat()}（{WEEKDAY_CN[target_weekday]}）",
         "workout_id": wo.id,
         "from": {"date": wo.date.isoformat(), "start_time": wo.start_time},
         "to": {"date": new_date.isoformat(), "weekday": target_weekday,
@@ -853,7 +896,7 @@ def check_easy_replacement(db: Session, athlete: models.Athlete, workout_id: int
     slot_min = max((s["duration_minutes"] for s in slots), default=0)
     if not slot_min:
         return {"ok": False, "reasons": [
-            f"{WEEKDAY_NAMES[wo.date.weekday()]}没有可训练时段（日程管理中该日无 available 空档）"]}
+            f"{WEEKDAY_CN[wo.date.weekday()]}没有可训练时段（日程管理中该日无 available 空档）"]}
     target_km = round(min(wo.distance_km, slot_min / planner.SLOT_CAP_MIN_PER_KM), 1)
     if target_km < 3:
         return {"ok": False, "reasons": [f"当天最长空档仅 {slot_min} 分钟，放不下有意义的轻松跑"]}
@@ -902,7 +945,7 @@ def check_add_workout(db: Session, athlete: models.Athlete, target_date: str) ->
     slot_min = max((s["duration_minutes"] for s in slots), default=0)
     if not slot_min:
         return {"ok": False, "reasons": [
-            f"{WEEKDAY_NAMES[d.weekday()]}没有可训练时段（日程管理中该日无 available 空档）"]}
+            f"{WEEKDAY_CN[d.weekday()]}没有可训练时段（日程管理中该日无 available 空档）"]}
     target_km = round(min(8.0, slot_min / planner.SLOT_CAP_MIN_PER_KM), 1)   # 与排课/换轻松跑同口径
     if target_km < 3:
         return {"ok": False, "reasons": [f"当天最长空档仅 {slot_min} 分钟，放不下有意义的轻松跑"]}
@@ -915,7 +958,7 @@ def check_add_workout(db: Session, athlete: models.Athlete, target_date: str) ->
                         f"超过计划峰值跑量 {plan.weekly_km_peak}km，请确认负荷可承受")
     return {"ok": True, "warnings": warnings, "proposal": {
         "kind": "add_workout",
-        "title": f"在 {d.isoformat()}（{WEEKDAY_NAMES[d.weekday()]}）追加「{title}」",
+        "title": f"在 {d.isoformat()}（{WEEKDAY_CN[d.weekday()]}）追加「{title}」",
         "date": d.isoformat(),
         "summary": f"{title}：约 {round(dur)} 分钟，配速按当前 VDOT {round(pred.current_vdot, 1)} 由引擎计算",
         "added": {"title": title, "start_time": start_time, "distance_km": km,
@@ -938,7 +981,7 @@ def check_skip_workout(db: Session, athlete: models.Athlete, workout_id: int) ->
                         "若只是状态波动，可考虑减组数或换轻松跑，保留一点刺激")
     return {"ok": True, "warnings": warnings, "proposal": {
         "kind": "skip_workout",
-        "title": f"跳过 {wo.date.isoformat()}（{WEEKDAY_NAMES[wo.date.weekday()]}）的「{wo.title}」",
+        "title": f"跳过 {wo.date.isoformat()}（{WEEKDAY_CN[wo.date.weekday()]}）的「{wo.title}」",
         "workout_id": wo.id,
         "date": wo.date.isoformat(),
         "summary": _steps_summary(wo.structured) if wo.structured else wo.title,
@@ -1094,9 +1137,7 @@ def check_goal_update(db: Session, athlete: models.Athlete, changes: dict) -> di
                if k in _GOAL_CHANGE_KEYS and v not in (None, "")}
     if not changes:
         return {"ok": False, "reasons": ["没有可识别的目标字段（支持：比赛项目/目标成绩/比赛日期）"]}
-    goal = db.scalar(select(models.Goal).where(
-        models.Goal.athlete_id == athlete.id,
-        models.Goal.status == "active").order_by(models.Goal.id))
+    goal = active_goal(db, athlete.id)
     if goal is None and "race_type" not in changes:
         return {"ok": False, "reasons": ["当前没有活动目标，请先明确比赛项目（800米～全马均可）"]}
 
@@ -1280,7 +1321,17 @@ def _t_daily_checkin(db: Session, athlete: models.Athlete, args: dict) -> dict:
                                   _objective_signal(db, athlete))
     if not checkin:
         advice["verdict"] += "；也可以先请用户完成今日晨间打卡（总览页）再给出更准的建议"
-    return {"checkin": checkin, "advice": advice, "today_workout": workout}
+    # 恢复中的伤病是今日调档的硬信号：带上结构与渐进建议，模型不必再翻记忆/档案
+    from .injury import active_injuries, return_to_run_advice
+    actives = active_injuries(db, athlete.id)
+    injuries_brief = []
+    for inj in actives:
+        adv = return_to_run_advice(inj)
+        injuries_brief.append({"body_part": inj["body_part"], "severity_label": inj["severity_label"],
+                               "days_since_start": inj["days_since_start"],
+                               "suggested_level": adv["level"] if adv else None})
+    return {"checkin": checkin, "advice": advice, "today_workout": workout,
+            "active_injuries": injuries_brief}
 
 
 def _objective_signal(db: Session, athlete: models.Athlete) -> dict:
@@ -1334,6 +1385,15 @@ def _t_coach_briefing(db: Session, athlete: models.Athlete, args: dict) -> dict:
     flagged_gears = [g for g in (_t_gear_status(db, athlete, {}).get("gears") or [])
                      if g.get("flag") not in ("正常", "已退役")]
 
+    # 官方↔本地交叉校验：官方负荷比与本地 ACWR 判断背离时点名（两个口径打架必须让模型知道）
+    from .crosscheck import build_crosscheck, snapshots_dicts
+    crosscheck = build_crosscheck(snapshots_dicts(db, athlete.id), st.get("daily") or [], today)
+
+    # 恢复中的伤病：进简报并点名（今天是「按计划练」还是「避痛」的分岔点）
+    from .injury import active_injuries, return_to_run_advice
+    actives = active_injuries(db, athlete.id)
+    injury_advices = [return_to_run_advice(i) for i in actives]
+
     # attention：需要模型在回答里点名处理的项（在这里用规则筛，解释交给模型）
     attention: list[str] = []
     if advice.get("suggested_action"):
@@ -1352,6 +1412,15 @@ def _t_coach_briefing(db: Session, athlete: models.Athlete, args: dict) -> dict:
         attention.append(f"跑鞋「{g['name']}」{g['flag']}（累计 {g['total_km']}km）")
     if adherence and adherence["total"] and adherence["completed"] / adherence["total"] < 0.6:
         attention.append(f"近 8 周计划课完成率仅 {round(adherence['completed'] / adherence['total'] * 100)}%")
+    if not crosscheck.get("empty") and (crosscheck.get("load_divergence") or {}).get("triggered"):
+        attention.append(f"官方与本地负荷判断背离：{crosscheck['load_divergence'].get('detail')}")
+    cc_vo2 = None if crosscheck.get("empty") else crosscheck.get("vo2max_trend")
+    if cc_vo2 and cc_vo2.get("delta") is not None and abs(cc_vo2["delta"]) >= 1:
+        attention.append(cc_vo2["detail"])
+    for inj, adv in zip(actives, injury_advices, strict=True):
+        if adv:
+            attention.append(f"恢复中伤病：{inj['body_part']}（{inj['severity_label']}，第 "
+                             f"{inj['days_since_start']} 天），今日建议档位 {adv['level']}")
     if not acts and not metrics:
         attention.append("平台暂无训练/身体数据，可引导用户到「设置 → 平台连接」同步或到对应页面手动录入")
 
@@ -1371,6 +1440,15 @@ def _t_coach_briefing(db: Session, athlete: models.Athlete, args: dict) -> dict:
         "fueling": {"level": fueling.get("level"), "reasons": fueling.get("reasons")},
         "plan_adherence_8w": adherence,
         "gear_alerts": flagged_gears,
+        "official_crosscheck": None if crosscheck.get("empty") else {
+            "load_divergence": crosscheck["load_divergence"],
+            "vo2max_trend": crosscheck["vo2max_trend"],
+        },
+        "active_injuries": [{"body_part": i["body_part"],
+                             "severity_label": i["severity_label"],
+                             "days_since_start": i["days_since_start"],
+                             "suggested_level": a["level"] if a else None}
+                            for i, a in zip(actives, injury_advices, strict=True)],
         "attention": attention,
         "note": "本简报为各域要点汇总；某一维度需要更多细节时再补查对应 get_* 工具",
     }
@@ -1517,7 +1595,9 @@ def _t_method_detail(db: Session, athlete: models.Athlete, args: dict) -> dict:
     if not m:
         return {"ok": False, "reasons": [f"知识库中不存在 code={code} 的方法，请先用 search_training_methods 查询"]}
     full = method_library.method_full(m)
-    full["workouts"] = [method_library.workout_dict(w, with_structure=False) for w in full["workouts"]]
+    # method_full 里的 workouts 带 structure（前端渲染用）；LLM 只需轻量摘要，
+    # 逐组配速交给 resolve_method_workout 按 VDOT 解析
+    full["workouts"] = [method_library.workout_dict(w, with_structure=False) for w in (m.workouts or [])]
     return full
 
 
@@ -1584,9 +1664,6 @@ def _t_preview_method_week(db: Session, athlete: models.Athlete, args: dict) -> 
 
 def _t_review_method_week(db: Session, athlete: models.Athlete, args: dict) -> dict:
     """复盘体验周：完成率 + 打卡伤病信号 + ACWR → 结构化下一步建议。"""
-    from datetime import date as _d
-    from datetime import timedelta as _td
-
     plan = active_plan(db)
     if not plan or (plan.feasibility or {}).get("source") != "method_library":
         return {"ok": False, "reasons": ["当前没有进行中的体验周计划（计划页可生成）"]}
@@ -1603,7 +1680,7 @@ def _t_review_method_week(db: Session, athlete: models.Athlete, args: dict) -> d
     done = stats["completed"]
     ratio = done / stats["total"] if stats["total"] else 0.0
 
-    since = _d.today() - _td(days=7)
+    since = date.today() - timedelta(days=7)
     checks = db.scalars(select(models.DailyCheckin).where(
         models.DailyCheckin.athlete_id == athlete.id,
         models.DailyCheckin.date >= since)).all()
@@ -1643,6 +1720,39 @@ def _t_review_method_week(db: Session, athlete: models.Athlete, args: dict) -> d
             "note": "下一步落库仍需用户在知识库页手动确认（体验周/正式计划生成均为用户主动操作）"}
 
 
+# ---------------------------------------------------------------- 数据探索（跨记录聚合统计）
+
+def _t_query_data(db: Session, athlete: models.Athlete, args: dict) -> dict:
+    """跨记录聚合统计：复用探索白名单引擎拿确定性数字，模型只解读不算术。"""
+    try:
+        q = ExploreQueryIn.model_validate(
+            {**args, "limit": min(int(args.get("limit") or 50), 200)})
+    except (ValidationError, TypeError, ValueError) as e:
+        return {"ok": False, "reasons": [f"query_data 参数不合法：{_validation_brief(e)}"]}
+    result = explore.run_aggregate(
+        db, q.table, q.group_by,
+        [(m.col, m.agg) for m in q.metrics],
+        [(f.col, f.op, f.value) for f in q.filters],
+        q.date_from, q.date_to, q.limit)
+    # 维度值套上中文标签（周一/跑步…），模型直接可读；映射已用掉就不再回传省 token
+    for key, labels in result["label_maps"].items():
+        for row in result["rows"]:
+            row[key] = labels.get(row[key], row[key])
+    result.pop("label_maps")
+    result["table"] = q.table
+    result["note"] = ("数字为引擎确定性计算；truncated=true 表示行数达到上限，"
+                      "应收窄日期范围或维度后重查")
+    return result
+
+
+def _validation_brief(e: Exception) -> str:
+    """参数校验错误收敛成一句给 LLM 的话（pydantic 全文太长）。"""
+    if isinstance(e, ValidationError):
+        err = e.errors()[0]
+        return f"{'.'.join(str(x) for x in err['loc'])}: {err['msg']}"
+    return str(e)
+
+
 # ---------------------------------------------------------------- 注册表
 
 ToolImpl = Callable[[Session, models.Athlete, dict], dict]
@@ -1658,6 +1768,7 @@ TOOL_IMPLS: dict[str, ToolImpl] = {
     "get_recent_training": _t_recent_training,
     "get_training_history": _t_training_history,
     "get_activity_detail": _t_activity_detail,
+    "query_data": _t_query_data,
     "get_this_week_workouts": _t_this_week,
     "get_plan_overview": _t_plan_overview,
     "get_diet_status": _t_diet,

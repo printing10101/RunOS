@@ -10,6 +10,7 @@
 """
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
 import ipaddress
 import json
@@ -27,6 +28,7 @@ from sqlalchemy.orm import Session
 
 from ..config import settings
 from . import ai_tools, chat_fastpath
+from .vocab import WEEKDAY_CN
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +183,9 @@ SYSTEM_PROMPT = """你是「RunOS」的专属 AI 跑步教练，服务一位业�
    疲劳/状态差/想降强度保跑量时用 propose_easy_replacement；想加一次课用 propose_add_workout；临时去不了用
    propose_skip_workout（跳过强度课前先说明影响并给出减组/换轻松跑的替代选项）。禁止在回答里自行给出一套
    "调整后的课表数字"代替提案——没有经过引擎校验的数字是不可信的。工具校验失败时，如实解释原因并给出替代思路。
+   「推荐/优化/评估这周课表」这类请求同样受此约束：先查课表与状态，凡结论涉及具体改动（挪日期/调配速/换轻松跑/
+   减组数/加课/跳课），每一处都必须调用对应提案工具生成提案卡片交用户确认，禁止只在回答里口头描述一套
+   "调整后的安排"；核查后认为不需要动的，就明确回答本周课表维持原样并给出依据。
 9. 用户提到个人档案信息变化（姓名/体重/身高/静息心率/最大心率/HRV基准/出生年份/性别/训练年限，如「我体重85kg了」）时，
    必须调 propose_profile_update 生成更新提案，禁止只在回答里口头记下；若工具返回 needs_user_confirm=true
    （新值与档案差异异常），先向用户确认这是真实变化还是异常数据，得到肯定答复后携带 confirm_anomaly=true 重新调用，
@@ -202,19 +207,16 @@ SYSTEM_PROMPT = """你是「RunOS」的专属 AI 跑步教练，服务一位业�
 15. 回答时在相关处自然引用长期记忆里的事实（如给下肢力量课时想到旧伤），不要生硬复述记忆内容。
 
 当前用户：{athlete_name}，{athlete_age} 岁，{sex}，当前 VDOT {vdot}。
+{persona_line}
 {goal_line}
 {plan_line}
 {notes_line}"""
 
-WEEKDAY_CN = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
-
 
 def _goal_context_line(db, athlete_id: int) -> str:
     """活动目标的一句话锚点：让每轮回答都围绕真实目标，而不是泛泛的训练建议。"""
-    from sqlalchemy import select as _select
-    goal = db.scalar(_select(ai_tools.models.Goal).where(
-        ai_tools.models.Goal.athlete_id == athlete_id,
-        ai_tools.models.Goal.status == "active").order_by(ai_tools.models.Goal.id))
+    from ..data import active_goal
+    goal = active_goal(db, athlete_id)
     if not goal:
         return "当前未设置比赛目标（用户问目标类建议时，可引导其明确项目/成绩/日期）。"
     race = ai_tools._GOAL_RACE_NAMES.get(goal.race_type, goal.race_type)
@@ -315,6 +317,8 @@ KNOWLEDGE_KEYWORDS: tuple[str, ...] = (
     # 常见训练法/体系名（知识库收录的主题词）
     "汉森", "亚索", "法特莱克", "丹尼尔斯", "杰克·丹尼尔斯", "80/20", "极化",
     "maf", "lsd", "乳酸阈", "最大摄氧", "金字塔跑", "节奏跑怎么", "间歇怎么",
+    "盖洛威", "走跑", "皮茨", "哈德森", "first", "卡诺瓦", "莱迪亚德", "驿传", "箱根",
+    "川内", "大迫", "配速表", "训练体系", "哪些训练方法",
 )
 # 档案变更：铁律 10 列举的可变字段
 PROFILE_KEYWORDS: tuple[str, ...] = (
@@ -586,6 +590,74 @@ def review_timeout() -> float:
     return min(settings.ai_timeout, 90.0)
 
 
+def complete_text(prompt: str, *, max_tokens: int, temperature: float = 0.5,
+                  gate=None) -> str:
+    """解读/点评家族非流式补全的单一入口（此前五份复制的 POST 脚手架收敛于此）。
+
+    validate → 选解读模型 → POST → 剥 <think> → 空答报错；任何失败抛 ValueError，
+    由调用方转规则兜底。gate 传信号量（如点评的 _LLM_GATE）时串行排队，
+    避免首次同步的批量生成打满单槽推理栈；一次性解读调用不传即可。
+    """
+    base = settings.ai_base_url.rstrip("/")
+    bad = validate_base_url(base)
+    if bad:
+        raise ValueError(bad)
+    payload = {"model": review_model_id(probe_cached()["models"]),
+               "temperature": temperature,
+               **review_gen_kwargs(max_tokens),
+               "messages": [{"role": "user", "content": prompt}]}
+    try:
+        with gate or contextlib.nullcontext():
+            r = httpx.post(
+                f"{base}/chat/completions", json=payload, headers=_auth_headers(),
+                timeout=httpx.Timeout(review_timeout(), connect=5.0))
+            r.raise_for_status()
+            content = r.json()["choices"][0]["message"]["content"] or ""
+    except Exception as e:
+        raise ValueError(f"本地模型不可用：{e}") from e
+    text = _strip_think(content).strip()
+    if not text:
+        raise ValueError("模型没有返回内容")
+    return text
+
+
+def complete_json(system_prompt: str, user_text: str, *, no_json_tip: str,
+                  temperature: float = 0.1) -> dict:
+    """JSON 提取家族（目标参数解析/营养估算）的公共路径。
+
+    POST → 剥 <think>/代码围栏 → 截取首尾花括号 → json.loads；拿到非 dict 或
+    没有 JSON 时抛 ValueError（no_json_tip 是给用户看的中文指引）。
+    """
+    base = settings.ai_base_url.rstrip("/")
+    bad = validate_base_url(base)
+    if bad:
+        raise ValueError(bad)
+    try:
+        r = httpx.post(
+            f"{base}/chat/completions",
+            json={"model": _effective_model(probe_cached()["models"]), "stream": False,
+                  "think": False, "temperature": temperature,   # 参数提取要稳定，不要发散
+                  "messages": [{"role": "system", "content": system_prompt},
+                               {"role": "user", "content": user_text}]},
+            headers=_auth_headers(),
+            timeout=httpx.Timeout(settings.ai_timeout, connect=5.0))
+        r.raise_for_status()
+        content = r.json()["choices"][0]["message"]["content"] or ""
+    except Exception as e:
+        raise ValueError(f"本地模型不可用或解析失败：{e}") from e
+    content = _strip_think(content).strip()
+    if content.startswith("```"):
+        content = content.split("```")[1].removeprefix("json").strip()
+    start, end = content.find("{"), content.rfind("}")
+    if start == -1 or end == -1:
+        raise ValueError(no_json_tip)
+    params = json.loads(content[start:end + 1])
+    # 模型偶发返回数组/字符串：非 dict 直接按解析失败处理，而不是 AttributeError → 500
+    if not isinstance(params, dict):
+        raise ValueError(no_json_tip)
+    return params
+
+
 class ThinkFilter:
     """流式输出中过滤 <think>…</think> 思考段（部分模型即使请求关闭思考也会输出）。"""
 
@@ -629,6 +701,7 @@ def _strip_think(text: str) -> str:
 
 def system_prompt(db: Session) -> str:
     from .ai_tools import _get_athlete
+    from .coach_persona import persona_for_athlete
     athlete = _get_athlete(db)
     from ..data import build_prediction
     vdot = build_prediction(db, athlete.id).current_vdot
@@ -638,6 +711,7 @@ def system_prompt(db: Session) -> str:
         athlete_name=athlete.name, athlete_age=_dt.date.today().year - athlete.birth_year,
         sex="男" if athlete.sex == "male" else "女",
         vdot=vdot if vdot else "未知",
+        persona_line="【教练人设】" + persona_for_athlete(db, athlete.id),
         goal_line=_goal_context_line(db, athlete.id),
         plan_line=_plan_context_line(db),
         notes_line=_notes_context_line(db, athlete.id),
@@ -892,6 +966,163 @@ def _finalize_answer(client, base: str, model_id: str, msgs: list[dict],
     return res["content"]
 
 
+# ---------------------------------------------------------------- 口头调整护栏（确定性，收尾前最后一道）
+# 2026-09-28 复盘：用户请教练「推荐这周的课表和相应的配速」，模型调了 6 个查询工具后
+# 只在回答里口头给出一套「可调低周日20km配速至7:20/km」——零提案，用户拿到一段改不了
+# 课表的话。根因有二：提示词的提案铁律挂在「用户要求调整课表」上，盖不住「推荐/优化」；
+# 且铁律只是纪律，从没有确定性机制兜底。这里用代码兜底：答案命中「改动措辞」或用户消息
+# 命中「档案/目标变更」而整轮零提案时，追加最多两轮「提案转换」（非流式，不打扰用户已读
+# 到的正文），把口头改动落成提案卡片。转换是模型决策不是自动应用——护栏只负责把它叫回来，
+# 无实质改动时模型可以不提案，所以误触发的代价只是多一轮本地请求，设计上宁可从宽触发。
+#
+# 刻意不纳入护栏的：remember_user_note（教练自己的记忆无执行风险，且语汇太泛，
+# 确定性正则逮不住「值得记的长期信息」）；知识库引用（只读，无变更可言）。
+
+SCHEDULE_PROPOSAL_TOOLS = frozenset({
+    "propose_move_workout", "propose_quality_adjustment",
+    "propose_easy_replacement", "propose_add_workout", "propose_skip_workout"})
+GUARD_TOOL_NAMES = frozenset(SCHEDULE_PROPOSAL_TOOLS | {
+    "get_this_week_workouts", "propose_profile_update", "precheck_goal",
+    "propose_goal_update"})
+_GUARD_SCHEMA = [t for t in ai_tools.TOOLS_SCHEMA
+                 if t["function"]["name"] in GUARD_TOOL_NAMES]
+
+# 口头课表改动的触发词：改动动词 + 24 字内的具体对象（数字/配速/组/课/跑…）。
+# 描述现状（「配速区间为 6:51-7:29」「周日长距离 20km」）不含改动动词，不会命中；
+# 边界场景（如条件句「累了的话可以把周日换成轻松跑」）交给转换轮的模型复核。
+_SCHEDULE_CHANGE_RE = re.compile(
+    r"(调低|调高|调至|调成|调整为|改为|改成|改到|改至|换成|换为|替换为|替换成|降为|降到|降至"
+    r"|升到|升至|放宽至|放宽到|收紧至|收紧到|压到|压至|减到|减至|增加到|增加至"
+    r"|挪到|挪至|挪去|移到|移至|放到|放在|推迟到|推迟至|提前到|提前至)"
+    r"[^。；;\n]{0,24}?(\d|配速|组数?|课|跑|强度|距离|时间|日期)"
+    # 把字句：对象在动词前（「把长距离放到周日」「把间歇挪到周三」）
+    r"|(?:长距离|质量课|强度课|间歇|节奏跑|耐力课)[^。；;\n]{0,6}?"
+    r"(?:挪到|挪至|挪去|移到|移至|放到|放在|推迟到|推迟至|提前到|提前至|减到|减至|换成)"
+    r"|(跳过|取消|删掉)[^。；;\n]{0,16}(课|训练|长距离|间歇|节奏)"
+    # 跳过/取消的把字句（「周四那节课跳过吧」）
+    r"|(?:课|训练|长距离|间歇|节奏跑)[^。；;\n]{0,4}?(?:跳过|取消|删掉)")
+# 档案变更看**用户消息**（铁律 9 的字段 + 数字 / 自报姓名）：模型复述工具返回的体重
+# 不算变更，但用户亲口说「我体重85kg了」而教练只口头应下，就该补提案。
+_PROFILE_CHANGE_RE = re.compile(
+    r"(体重|身高|静息心率|最大心率|hrv\s*基[准线]|出生年(?:份|度)?|训练年限)[^。；;\n]{0,6}\d"
+    r"|我(?:叫|的名字(?:叫|是)|姓名(?:叫|是))[^。；;\n]{0,8}", re.IGNORECASE)
+# 目标变更同样看用户消息（铁律 10）。
+_GOAL_CHANGE_RE = re.compile(
+    r"目标[^。；;\n]{0,4}(?:改成|调成|改为|换成|更新为|调整为|定[成为]|设为)"
+    r"|改[跑成](?:全马|半马|马拉松|十公里|10公里|5公里|五公里)"
+    r"|(?:想跑|想报|报名了?)[^。；;\n]{0,2}(?:全马|半马|马拉松|10k|10公里|5k|5公里)"
+    r"|(?:破[三四五12345]|sub\s?[345])"
+    r"|跑进\s?\d{1,2}(?:[:：分]|分钟)?")
+
+GUARD_CONVERT_INSTRUCTION = (
+    "系统复核：你在上面的回答里出现了{kinds}的内容，但整轮对话没有生成任何变更提案。"
+    "规则是：课表/档案/目标的改动必须落成提案工具调用（用户在界面上确认后才生效），"
+    "口头调整等于没有调整。请基于上文已有的工具结果，把回答中的改动逐条转成对应的提案调用：\n"
+    "· 课表改动 → propose_move_workout / propose_quality_adjustment / propose_easy_replacement / "
+    "propose_add_workout / propose_skip_workout（缺 workout_id 时先调 get_this_week_workouts）；\n"
+    "· 档案信息变化 → propose_profile_update；目标变化 → 先 precheck_goal 再 propose_goal_update。\n"
+    "若复核后确认没有需要落成提案的实质改动（只是描述现状、或用户尚未表达要改的意愿），"
+    "则一个工具都不要调用。无论如何不要重复上一条回答的正文，也不要输出多余的话。"
+)
+GUARD_MAX_ROUNDS = 2   # 一轮取 workout_id、一轮出提案，已覆盖最坏路径
+
+
+def _unenforced_change_kinds(user_text: str, answer_text: str,
+                             called_tools: set[str]) -> list[str]:
+    """检测「有变更内容但零提案」，返回需要补提案的类别名（课表调整/档案更新/目标变更）。"""
+    kinds: list[str] = []
+    if answer_text and _SCHEDULE_CHANGE_RE.search(answer_text) \
+            and not (called_tools & SCHEDULE_PROPOSAL_TOOLS):
+        kinds.append("课表调整")
+    if user_text and _PROFILE_CHANGE_RE.search(user_text) \
+            and "propose_profile_update" not in called_tools:
+        kinds.append("档案更新")
+    if user_text and _GOAL_CHANGE_RE.search(user_text) \
+            and not (called_tools & {"propose_goal_update", "precheck_goal"}):
+        kinds.append("目标变更")
+    return kinds
+
+
+def _guard_post_once(client, base: str, model_id: str, msgs: list[dict]) -> dict | None:
+    """护栏专用的一次非流式请求：正文已在用户眼前，转换轮的输出不再进流；失败返回 None。"""
+    try:
+        r = client.post(
+            f"{base}/chat/completions", headers=_auth_headers(),
+            json={"model": model_id, "messages": msgs, "stream": False, "think": False,
+                  "temperature": 0.2, "tools": _GUARD_SCHEMA})
+        r.raise_for_status()
+        msg = (r.json()["choices"] or [{}])[0].get("message") or {}
+    except Exception as e:
+        logger.info("提案转换轮请求失败，原回答照常交付：%s", e)
+        return None
+    return {"content": str(msg.get("content") or ""),
+            "tool_calls": msg.get("tool_calls") or []}
+
+
+def _proposal_guard(db, athlete, client, base: str, model_id: str,
+                    msgs: list[dict], answer_text: str, user_text: str,
+                    proposals: list[dict], seen_calls: set[str],
+                    called_tools: set[str]) -> Iterator[dict]:
+    """口头调整护栏：有变更内容、零提案 → 追加「提案转换」轮补出提案卡片。
+
+    最多两轮请求；任何失败都原样放行。护栏是补偿不是闸门——它永远不能反过来
+    卡住用户已经读到的回答，也不能产出第二个 error 路径。
+    """
+    if not settings.ai_proposal_guard or proposals or not answer_text:
+        return
+    kinds = _unenforced_change_kinds(user_text, answer_text, called_tools)
+    if not kinds:
+        return
+    logger.info("口头调整护栏命中（%s）：追加提案转换轮", "、".join(kinds))
+    # 主循环/收尾的最终回答都只存在于局部变量里，没进 msgs——转换轮必须先把它
+    # 补成一条 assistant 消息，否则指令里「你的上一条回答」对模型是空指代。
+    conv_msgs = [*msgs,
+                 {"role": "assistant", "content": answer_text},
+                 {"role": "user",
+                  "content": GUARD_CONVERT_INSTRUCTION.format(kinds="、".join(kinds))}]
+    for _ in range(GUARD_MAX_ROUNDS):
+        msg = _guard_post_once(client, base, model_id, conv_msgs)
+        if not msg or not msg["tool_calls"]:
+            return
+        conv_msgs.append({"role": "assistant", "content": msg["content"], "tool_calls": [
+            {"id": t.get("id") or f"guard_{i}", "type": "function",
+             "function": {"name": (t.get("function") or {}).get("name", ""),
+                          "arguments": (t.get("function") or {}).get("arguments") or "{}"}}
+            for i, t in enumerate(msg["tool_calls"])]})
+        made_proposal = False
+        for t in conv_msgs[-1]["tool_calls"]:
+            name = t["function"]["name"]
+            raw_args = t["function"]["arguments"]
+            fingerprint = f"{name}:{raw_args}"
+            if name not in ai_tools.TOOL_IMPLS:
+                content = json.dumps({"ok": False, "reasons": [f"未知工具 {name}"]},
+                                     ensure_ascii=False)
+            elif fingerprint in seen_calls:
+                # 主循环已查过的结果就在上文，别再喂一遍——让模型直接据此出提案
+                content = json.dumps({"ok": False, "reasons": [REPEAT_CALL_HINT]},
+                                     ensure_ascii=False)
+            else:
+                seen_calls.add(fingerprint)
+                try:
+                    args = json.loads(raw_args)
+                except json.JSONDecodeError:
+                    args = {}
+                result = ai_tools.execute_tool(db, athlete, name, args)
+                yield {"type": "tool", "name": name,
+                       "label": f"{ai_tools.TOOL_LABELS.get(name, name)}（提案补齐）",
+                       "ok": bool(result.get("ok"))}
+                if name.startswith("propose_") and result.get("proposal"):
+                    proposals.append(result["proposal"])
+                    made_proposal = True
+                content = json.dumps(result, ensure_ascii=False, default=str)
+                if len(content) > TOOL_RESULT_MAX_CHARS:
+                    keep = TOOL_RESULT_MAX_CHARS // 2
+                    content = (content[:keep] + "\n…[结果过长已截断]…" + content[-keep:])
+            conv_msgs.append({"role": "tool", "tool_call_id": t["id"], "content": content})
+        if made_proposal:
+            return
+
+
 def _chat_stream_impl(db: Session, history: list[dict], summary: str | None = None,
                       on_summary=None) -> Iterator[dict]:
     from .ai_tools import _get_athlete
@@ -941,6 +1172,7 @@ def _chat_stream_impl(db: Session, history: list[dict], summary: str | None = No
             # 裁剪前先做「摘要回收」：被裁掉的旧段压缩成滚动摘要注入头部并持久化。
             _compress_and_trim(msgs, budget, summary, on_summary, client, base, model_id)
             seen_calls: set[str] = set()   # 已执行过的「工具+参数」指纹，用于拦截重复调用
+            called_tools: set[str] = set()  # 真实执行过的工具名，口头调整护栏据此判断「零提案」
             stale_rounds = 0               # 连续「零个新工具被调用」的轮数
             rounds_used = 0
             if scope_hint:
@@ -956,13 +1188,19 @@ def _chat_stream_impl(db: Session, history: list[dict], summary: str | None = No
                 assistant_content, tool_calls = res["content"], res["tool_calls"]
 
                 if not tool_calls:
-                    # 模型给出最终回答，正常结束；空答不急着报错，先让收尾通道再试一次
+                    if not assistant_content:
+                        # 模型给出最终回答，正常结束；空答不急着报错，先让收尾通道再试一次
+                        logger.info("AI 第 %d 轮未产出工具调用与内容，进入收尾作答", rounds_used)
+                        break
+                    # 口头调整护栏：答案里有改动内容但整轮零提案 → 补一轮「提案转换」，
+                    # 把口头改动落成提案卡片（卡片在正文之后出现，用户先读到解释再确认）。
+                    # 能力闸门命中的轮次照跑：混合请求里在域部分的改动同样该有卡片。
+                    yield from _proposal_guard(db, athlete, client, base, model_id,
+                                               msgs, assistant_content, latest,
+                                               proposals, seen_calls, called_tools)
                     if proposals:
                         yield {"type": "proposals", "items": proposals}
-                    if assistant_content:
-                        return
-                    logger.info("AI 第 %d 轮未产出工具调用与内容，进入收尾作答", rounds_used)
-                    break
+                    return
 
                 # 执行工具轮
                 msgs.append({"role": "assistant",
@@ -987,6 +1225,7 @@ def _chat_stream_impl(db: Session, history: list[dict], summary: str | None = No
                                              ensure_ascii=False)
                     else:
                         seen_calls.add(fingerprint)
+                        called_tools.add(name)
                         fresh = True
                         try:
                             args = json.loads(raw_args)
@@ -1028,6 +1267,14 @@ def _chat_stream_impl(db: Session, history: list[dict], summary: str | None = No
             # 走不到这里；走到这里说明模型始终没产出内容，指引就是最后的话）。
             answer = yield from _finalize_answer(client, base, model_id, msgs,
                                                  hint=scope_hint or None)
+            if answer and not proposals and not scope_hint:
+                # 收尾作答同样过护栏：触顶/停滞前的最后一段话也可能带着口头调整。
+                # 闸门命中的轮次除外——收尾在讲「做不到 + 去哪手动做」，跟提案转换打架。
+                yield from _proposal_guard(db, athlete, client, base, model_id,
+                                           msgs, answer, latest,
+                                           proposals, seen_calls, called_tools)
+                if proposals:
+                    yield {"type": "proposals", "items": proposals}
             if not answer:
                 if scope_hint:
                     # 模型连收尾都没能产出：直接把指引原文交给用户——
@@ -1060,35 +1307,9 @@ EXTRACT_PROMPT = """你是参数提取器。从用户的自然语言目标中提
 def extract_goal_params(text: str) -> dict:
     """调用本地模型把自由文本解析成 generate_plan 参数。解析失败抛 ValueError。"""
     today = _dt.date.today().isoformat()
-    base = settings.ai_base_url.rstrip("/")
-    bad = validate_base_url(base)
-    if bad:
-        raise ValueError(bad)
-    try:
-        r = httpx.post(
-            f"{base}/chat/completions",
-            json={"model": _effective_model(probe_cached()["models"]), "stream": False, "think": False,
-                  "temperature": 0.1,   # 参数提取/数值估算要稳定，不要发散
-                  "messages": [{"role": "system",
-                                 "content": EXTRACT_PROMPT.format(today=today, text=text[:500])},
-                                {"role": "user", "content": text[:500]}]},
-            headers=_auth_headers(),
-            timeout=httpx.Timeout(settings.ai_timeout, connect=5.0),
-        )
-        r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"] or ""
-    except Exception as e:
-        raise ValueError(f"本地模型不可用或解析失败：{e}") from e
-    content = _strip_think(content).strip()
-    if content.startswith("```"):
-        content = content.split("```")[1].removeprefix("json").strip()
-    start, end = content.find("{"), content.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError("模型没有返回可解析的 JSON，请换个说法描述目标")
-    params = json.loads(content[start:end + 1])
-    # 模型偶发返回数组/字符串：非 dict 直接按解析失败处理，而不是 AttributeError → 500
-    if not isinstance(params, dict):
-        raise ValueError("模型返回的参数格式异常，请换个说法描述目标")
+    params = complete_json(
+        EXTRACT_PROMPT.format(today=today, text=text[:500]), text[:500],
+        no_json_tip="模型没有返回可解析的 JSON，请换个说法描述目标")
     if params.get("race_type") not in ai_tools.vdot.GOAL_RACE_TYPES:
         raise ValueError("没能识别出比赛项目（800米～全马均可，如 800m/1k/5k/半马/全马），请明确一下")
     if params.get("target_time_sec") is not None:
@@ -1120,31 +1341,8 @@ ESTIMATE_PROMPT = """你是营养估算器。根据用户描述的一餐食物�
 
 def estimate_meal_nutrition(text: str) -> dict:
     """调用本地模型按食物描述估算营养素。失败抛 ValueError（中文原因，调用方转 HTTP 错误）。"""
-    base = settings.ai_base_url.rstrip("/")
-    bad = validate_base_url(base)
-    if bad:
-        raise ValueError(bad)
-    try:
-        r = httpx.post(
-            f"{base}/chat/completions",
-            json={"model": _effective_model(probe_cached()["models"]), "stream": False, "think": False,
-                  "temperature": 0.1,   # 参数提取/数值估算要稳定，不要发散
-                  "messages": [{"role": "system", "content": ESTIMATE_PROMPT.format(text=text[:500])},
-                               {"role": "user", "content": text[:500]}]},
-            headers=_auth_headers(),
-            timeout=httpx.Timeout(settings.ai_timeout, connect=5.0),
-        )
-        r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"] or ""
-    except Exception as e:
-        raise ValueError(f"本地模型不可用或估算失败：{e}") from e
-    content = _strip_think(content).strip()
-    if content.startswith("```"):
-        content = content.split("```")[1].removeprefix("json").strip()
-    start, end = content.find("{"), content.rfind("}")
-    if start == -1 or end == -1:
-        raise ValueError("模型没有返回可解析的结果，请手动填写营养数字")
-    raw = json.loads(content[start:end + 1])
+    raw = complete_json(ESTIMATE_PROMPT.format(text=text[:500]), text[:500],
+                        no_json_tip="模型没有返回可解析的结果，请手动填写营养数字")
 
     def _num(key: str, cap: float) -> float:
         try:

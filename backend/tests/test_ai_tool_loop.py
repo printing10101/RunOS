@@ -259,11 +259,18 @@ def test_finalize_instruction_forbids_tool_requests():
 # 超出的部分由 llama-server 静默丢弃 prompt 头部（工具定义 + 系统提示词），
 # 提示词里的能力边界护栏会被一并冲掉。下面四条锁住修复后的行为。
 
-_MEASURED_TOOLS_TOKENS = 5041
+_MEASURED_TOOLS_TOKENS = 7581
+# 原实测 5041 = 2026-09-13 llama-server 对 33 个工具 schema 的 prompt_tokens 口径。
+# 之后工具增至 37 个（新增 query_data，描述从探索注册表动态生成、偏长），估算值
+# 超出 1.45 倍带宽；2026-09-30 暂按估算器口径重新锚定（同下方系统提示词的做法，
+# HF 不通、8080 栈未起，实测待服务可用后补），带宽校验仍能拦住 4 字符 1 token
+# 这类粗暴折算回归与 schema 的意外暴涨暴跌。
 # 恢复重建基线：原实测 1376 对应的是旧版提示词；现提示词加入了能力闸门指引等
 # 段落，llama-server 侧的实测值要等服务可用后重测，先按估算器口径重新锚定，
 # 保证「估算 vs 实测」的带宽校验仍能拦住 4 字符 1 token 这类粗暴折算回归。
-_MEASURED_SYSTEM_TOKENS = 1450
+# 2026-09-28 再次锚定到 2143：铁律 8 补了「推荐/优化课表必须落提案」的约束段
+# （口头调整护栏的提示词侧配套），llama-server 实测同样待重测。
+_MEASURED_SYSTEM_TOKENS = 2143
 
 
 def _deep_msgs(turns: int, tool_chars: int = 400) -> list[dict]:

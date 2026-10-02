@@ -231,8 +231,8 @@ def _run():
         # 只有 start_date 是周一时「挪到周几」才与用户认知一致（方法库体验周的 start_date 常不是周一）。
         real_wd = _date.fromisoformat(expect_date).weekday()
         if real_wd != target_wd:
-            print(f"[!] 语义错位：target_weekday={target_wd}（{ai_tools.WEEKDAY_NAMES[target_wd]}）"
-                  f"实际落到 {expect_date}（{ai_tools.WEEKDAY_NAMES[real_wd]}）——"
+            print(f"[!] 语义错位：target_weekday={target_wd}（{ai_tools.WEEKDAY_CN[target_wd]}）"
+                  f"实际落到 {expect_date}（{ai_tools.WEEKDAY_CN[real_wd]}）——"
                   "该 PlanWeek.start_date 不是周一，proposal 文案会与实际落期不符")
         rejected = next(((d, ai_tools.check_move(db, a, w3.id, d)) for d in range(7)
                          if not ai_tools.check_move(db, a, w3.id, d)["ok"]), None)

@@ -233,6 +233,53 @@ def test_build_weekly_recap_empty_no_athlete():
     result = weekly_recap.build_weekly_recap(db)
     assert result == {"empty": True}
 
+
+def test_next_week_ignores_archived_plan():
+    """「下周预览」只看当前有效计划，不吃归档计划的残留周。
+
+    回归锁定：archive_plan 只删归档计划的 planned 课、plan_weeks 行全保留，
+    旧的不限定 plan_id 的查询会把归档计划的未来周当「下周」（其课已清，
+    渲染成「共 0 节课」）。"""
+    from datetime import date as dt_date
+
+    from app.models import Activity, PlanWeek, TrainingPlan
+    from factories import make_athlete
+
+    db = _fresh_db()
+    a = make_athlete(name="换计划的人")
+    db.add(a)
+    db.commit()
+    # 本周有一次跑（不然整个 recap 直接 empty）
+    this_start = weekly_recap._week_start(date.today())
+    db.add(Activity(athlete_id=a.id, sport="run",
+                    start_time=datetime.combine(this_start, datetime.min.time()),
+                    distance_m=5000, duration_sec=1500, avg_hr=145, training_load=100))
+    # 已归档的旧计划：残留一个更早的未来周（归档清课不删周行）；
+    # 活跃计划的下周刻意更晚——只有限定 plan_id 的查询才不会拿错周
+    old = TrainingPlan(athlete_id=a.id, race_type="marathon", name="旧计划",
+                       start_date=dt_date.today() - timedelta(days=90),
+                       race_date=dt_date.today() + timedelta(days=30), status="archived")
+    db.add(old)
+    active = TrainingPlan(athlete_id=a.id, race_type="marathon", name="当前计划",
+                          start_date=dt_date.today() - timedelta(days=7),
+                          race_date=dt_date.today() + timedelta(days=77), status="active")
+    db.add(active)
+    db.commit()
+    db.add(PlanWeek(plan_id=old.id, week_index=14,
+                    start_date=this_start + timedelta(days=7),
+                    phase="peak", target_km=70, focus="旧计划的巅峰周"))
+    db.add(PlanWeek(plan_id=active.id, week_index=2,
+                    start_date=this_start + timedelta(days=14),
+                    phase="build", target_km=50, focus="当前计划的下一周"))
+    db.commit()
+
+    result = weekly_recap.build_weekly_recap(db)
+    assert not result.get("empty")
+    assert result["next"] is not None
+    assert result["next"]["focus"] == "当前计划的下一周", \
+        "归档计划的残留周不能充当「下周预览」"
+
+
 def test_build_weekly_recap_empty_no_activity():
     """有运动员但没训练 → 不是 error，返回结构带空数据。"""
     db = _fresh_db()

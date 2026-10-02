@@ -20,10 +20,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from statistics import median
 
 from . import vdot, zones
 
-# 护栏常量与分半解析统一定在解析层（activity_detail），洞察层只引用
+# 护栏常量与分半解析统一定义在解析层（activity_detail），洞察层只引用
 from .activity_detail import MAX_ELEV_PER_KM, activity_halves, decoupling_pct
 from .fitness_metrics import _threshold_candidates, compare_vo2_sources, estimate_lthr
 
@@ -75,8 +76,6 @@ def _fail(ins: dict, reason: str) -> dict:
     return ins
 
 
-# ---------------------------------------------------------------- 设备逐段数据获取
-
 # ---------------------------------------------------------------- 1. 有氧解耦
 
 def _decoupling_insight(runs: list[dict], athlete: dict, now: datetime) -> dict:
@@ -113,29 +112,29 @@ def _decoupling_insight(runs: list[dict], athlete: dict, now: datetime) -> dict:
         return _fail(ins, f"近 8 周只有 {len(recent)} 次带设备逐段心率的跑步（40min 以上），"
                           "样本不足无法评估。已同步佳明/Strava/高驰明细的活动才会进入本指标")
     vals = sorted(s["decoupling_pct"] for s in recent)
-    median = vals[len(vals) // 2] if len(vals) % 2 else (vals[len(vals)//2 - 1] + vals[len(vals)//2]) / 2
+    med = median(vals)
     ins["available"] = True
-    ins["value"] = round(median, 1)
-    ins["display"] = f"{median:.1f}%"
+    ins["value"] = round(med, 1)
+    ins["display"] = f"{med:.1f}%"
     ins["samples"] = sorted(recent, key=lambda s: s["date"], reverse=True)
-    if median < 5:
+    if med < 5:
         ins["verdict"] = "good"
         ins["verdict_label"] = "优秀"
-        ins["why"] = (f"近 8 周 {len(recent)} 次带心率训练的中位解耦 {median:.1f}%（<5% 优秀），"
+        ins["why"] = (f"近 8 周 {len(recent)} 次带心率训练的中位解耦 {med:.1f}%（<5% 优秀），"
                       "后半程心率几乎不漂移，长距离有氧底子扎实")
         ins["actions"] = ["有氧耐力不是当前短板，维持现有 Z2 跑量与长距离节奏即可",
                           "可以把训练重心转向阈值/最大摄氧量等上限能力"]
-    elif median <= 8:
+    elif med <= 8:
         ins["verdict"] = "watch"
         ins["verdict_label"] = "合格"
-        ins["why"] = (f"中位解耦 {median:.1f}%（5-8% 合格区间），长时间输出心率会缓慢上漂，"
+        ins["why"] = (f"中位解耦 {med:.1f}%（5-8% 合格区间），长时间输出心率会缓慢上漂，"
                       "有氧耐力可用但还有空间")
         ins["actions"] = ["轻松跑严格执行 Z2 上沿以下，宁慢勿快——漂移改善最快的杠杆",
                           "每 2 周一次 90min+ 全程不断速的长距离，训练脂肪供能效率"]
     else:
         ins["verdict"] = "bad"
         ins["verdict_label"] = "待提升"
-        ins["why"] = (f"中位解耦 {median:.1f}%（>8% 偏高），后半程同配速心率显著升高，"
+        ins["why"] = (f"中位解耦 {med:.1f}%（>8% 偏高），后半程同配速心率显著升高，"
                       "说明有氧耐力限制了长距离表现——这不是意志问题，是慢肌与脂肪供能通路还没练够")
         ins["actions"] = ["把总跑量的 75-80% 压到 Z2 以下（储备心率 60-70%），坚持 6-8 周再复测",
                           "长距离课配速下调 15-30s/km，优先完成时间而不是完成配速",
@@ -160,12 +159,15 @@ def _zone_distribution_insight(runs: list[dict], athlete: dict, now: datetime) -
     if not max_hr or not rest_hr:
         return _fail(ins, "档案缺最大/静息心率，无法划分心率区间（到设置页补齐后即恢复）")
 
-    def window_secs(days: int) -> tuple[dict, int, int] | None:
+    def window_secs(days: int, until: datetime | None = None) -> tuple[dict, int, int] | None:
         cut = (now - timedelta(days=days)).date().isoformat()
+        # 对照窗口必须双边裁剪：只按下界裁，「前 28 天」会混入当前 28 天、基线被稀释
+        hi = until.date().isoformat() if until else None
         totals = {f"Z{i}": 0.0 for i in range(1, 6)}
         n_dev = n_est = 0
         for a in runs:
-            if (a.get("start_time") or now).date().isoformat() <= cut:
+            d = (a.get("start_time") or now).date()
+            if d.isoformat() <= cut or (hi and d.isoformat() > hi):
                 continue
             if a.get("sport") != "run":
                 continue
@@ -194,7 +196,7 @@ def _zone_distribution_insight(runs: list[dict], athlete: dict, now: datetime) -
     pct = {k: round(hours[k] / total_h * 100) for k in hours}
     easy, gray, hard = pct["Z1"] + pct["Z2"], pct["Z3"], pct["Z4"] + pct["Z5"]
 
-    prev = window_secs(56)
+    prev = window_secs(56, until=now - timedelta(days=28))
     prev_easy = None
     if prev:
         pt = sum(prev[0].values())

@@ -11,11 +11,9 @@ from __future__ import annotations
 import logging
 from datetime import date
 
-import httpx
 from sqlalchemy.orm import Session
 
 from .. import models
-from ..config import settings
 from ..data import activities_dicts, build_evaluation, plan_adherence_dict
 from . import ai_coach, evaluator, review_guard
 
@@ -126,29 +124,8 @@ def gather_facts(db: Session, athlete: models.Athlete) -> dict:
 
 def generate_text(facts: dict) -> str:
     """调用本地模型写解读。失败抛 ValueError（调用方转规则兜底或报错）。"""
-    base = settings.ai_base_url.rstrip("/")
-    bad = ai_coach.validate_base_url(base)
-    if bad:
-        raise ValueError(bad)
     prompt = REVIEW_PROMPT.format(today=date.today().isoformat(), **facts)
-    try:
-        r = httpx.post(
-            f"{base}/chat/completions",
-            json={"model": ai_coach.review_model_id(ai_coach.probe_cached()["models"]),
-                  "stream": False, "temperature": 0.5,
-                  **ai_coach.review_gen_kwargs(MAX_REVIEW_TOKENS),
-                  "messages": [{"role": "user", "content": prompt}]},
-            headers=ai_coach._auth_headers(),
-            timeout=httpx.Timeout(ai_coach.review_timeout(), connect=5.0),
-        )
-        r.raise_for_status()
-        content = r.json()["choices"][0]["message"]["content"] or ""
-    except Exception as e:
-        raise ValueError(f"本地模型不可用：{e}") from e
-    text = ai_coach._strip_think(content).strip()
-    if not text:
-        raise ValueError("模型没有返回内容")
-    return text
+    return ai_coach.complete_text(prompt, max_tokens=MAX_REVIEW_TOKENS)
 
 
 def fallback_review(facts: dict) -> str:

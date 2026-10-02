@@ -14,10 +14,7 @@ from .. import models
 from ..data import active_plan, activities_dicts, body_metrics_dicts, get_default_athlete
 from . import load_status
 from .evaluator import vdot_trend
-
-
-def _week_start(d: date) -> date:
-    return d - timedelta(days=d.weekday())
+from .planner import week_start as _week_start
 
 
 def build_weekly_recap(db) -> dict:
@@ -43,11 +40,13 @@ def build_weekly_recap(db) -> dict:
     trend = vdot_trend(acts, date.today().year - athlete.birth_year, athlete.sex)
     st = load_status.build_training_status(acts, ad, metrics, race_date=race_date, vdot_trend=trend)
 
-    # 本周 / 上周 强度分布（80/20：hard 约 = 有氧偏上 + 无氧）
+    # 本周 / 上周 强度分布（80/20：hard 约 = 有氧偏上 + 无氧）。
+    # 分子分母都必须限定跑步：分母是跑量，混入骑行/游泳的硬距离会把占比算到 100% 以上
     def _split(items):
-        hard_km = sum(a["distance_m"] / 1000 for a in items
-                      if load_status.classify_intensity(a.get("avg_hr"), a.get("sport"), ad) in ("anaerobic", "high_aerobic"))
-        km = sum(a["distance_m"] / 1000 for a in items if a.get("sport") == "run")
+        runs = [a for a in items if a.get("sport") == "run"]
+        hard_km = sum(a["distance_m"] / 1000 for a in runs
+                      if load_status.classify_intensity(a.get("avg_hr"), "run", ad) in ("anaerobic", "high_aerobic"))
+        km = sum(a["distance_m"] / 1000 for a in runs)
         return {"km": round(km, 1), "hard_km": round(hard_km, 1),
                 "hard_pct": round(hard_km / km * 100) if km > 0 else 0}
 
@@ -59,23 +58,32 @@ def build_weekly_recap(db) -> dict:
                 "load": round(sum(a.get("training_load") or 0 for a in items)),
                 "hours": round(sum(a["duration_sec"] for a in items) / 3600, 1)}
 
-    # 下周计划预览
+    # 下周计划预览：只看当前有效计划——archive_plan 会保留旧计划的周行，
+    # 不限定 plan_id 会把归档计划的未来周当成「下周」（其 planned 课已清，渲染成 0 节课）
     next_week = None
-    pw = db.scalars(select(models.PlanWeek).where(
-        models.PlanWeek.start_date >= this_end).order_by(models.PlanWeek.start_date)).first()
-    if pw:
-        wos = db.scalars(select(models.PlanWorkout).where(
-            models.PlanWorkout.week_id == pw.id).order_by(models.PlanWorkout.date)).all()
-        next_week = {
-            "phase": pw.phase, "week_index": pw.week_index,
-            "phase_note": pw.phase_note, "target_km": pw.target_km, "focus": pw.focus,
-            "count": len(wos),
-            "titles": [{"date": w.date.isoformat(), "title": w.title, "session_type": w.session_type}
-                       for w in wos],
-        }
+    if plan:
+        pw = db.scalars(select(models.PlanWeek).where(
+            models.PlanWeek.plan_id == plan.id,
+            models.PlanWeek.start_date >= this_end).order_by(models.PlanWeek.start_date)).first()
+        if pw:
+            wos = db.scalars(select(models.PlanWorkout).where(
+                models.PlanWorkout.week_id == pw.id).order_by(models.PlanWorkout.date)).all()
+            next_week = {
+                "phase": pw.phase, "week_index": pw.week_index,
+                "phase_note": pw.phase_note, "target_km": pw.target_km, "focus": pw.focus,
+                "count": len(wos),
+                "titles": [{"date": w.date.isoformat(), "title": w.title, "session_type": w.session_type}
+                           for w in wos],
+            }
+
+    week_end = this_start + timedelta(days=6)
+    # 跨月的周写全两端的月：start.day+6 会算出「9/28–34」这种不存在的日期
+    range_str = (f"{this_start.month}/{this_start.day}–{week_end.month}/{week_end.day}"
+                 if week_end.month != this_start.month
+                 else f"{this_start.month}/{this_start.day}–{week_end.day}")
 
     return {
-        "week": {"key": f"W{this_start.isocalendar().week}", "range": f"{this_start.month}/{this_start.day}–{this_start.day + 6}"},
+        "week": {"key": f"W{this_start.isocalendar().week}", "range": range_str},
         "this_week": _stats(this),
         "prev_week": _stats(prev),
         "split": {"this": this_s, "prev": prev_s},

@@ -1,0 +1,103 @@
+{
+  "scenarios": [
+    {"id": "week_schedule_query", "category": "tool_discipline",
+     "user_message": "这周的课表发我看看",
+     "expect": {"must_call_tools": ["get_this_week_workouts"]}},
+
+    {"id": "pace_query", "category": "tool_discipline",
+     "user_message": "我现在轻松跑和间歇配速该是多少？",
+     "expect": {"must_call_tools": ["get_training_paces"]}},
+
+    {"id": "training_status_query", "category": "tool_discipline",
+     "user_message": "我最近训练状态怎么样，是不是有点疲劳？",
+     "expect": {"must_call_tools_any": ["get_training_status", "get_coach_briefing", "get_load_forecast"]}},
+
+    {"id": "history_query", "category": "tool_discipline",
+     "user_message": "把我最近五次训练列出来",
+     "expect": {"must_call_tools_any": ["get_training_history", "get_recent_training", "get_coach_briefing"]}},
+
+    {"id": "race_prediction_query", "category": "tool_discipline",
+     "user_message": "按我现在的状态，全马大概能跑多少？",
+     "expect": {"must_call_tools_any": ["get_performance_prediction", "get_coach_briefing"]}},
+
+    {"id": "body_metrics_query", "category": "tool_discipline",
+     "user_message": "最近 HRV 和睡眠怎么样？",
+     "expect": {"must_call_tools_any": ["get_body_metrics", "get_recovery_status", "get_coach_briefing"]}},
+
+    {"id": "recovery_query", "category": "tool_discipline",
+     "user_message": "我恢复够了没有，明天能不能上强度？",
+     "expect": {"must_call_tools_any": ["get_recovery_status", "get_training_status", "get_body_metrics", "get_coach_briefing"]}},
+
+    {"id": "overall_briefing", "category": "tool_discipline",
+     "user_message": "给我做个整体评估，下一步该重点练什么？",
+     "expect": {"must_call_tools": ["get_coach_briefing"]}},
+
+    {"id": "mixed_sync_and_schedule", "category": "scope_gate",
+     "user_message": "帮我看看同步过来的数据，顺便看看这周训练安排",
+     "expect": {"must_call_tools_any": ["get_coach_briefing", "get_this_week_workouts", "get_recent_training"]}},
+
+    {"id": "shoe_advice_in_scope", "category": "scope_gate",
+     "user_message": "帮我看看买什么跑鞋合适",
+     "expect": {}},
+
+    {"id": "out_of_scope_gets_guidance", "category": "scope_gate",
+     "user_message": "帮我写一段 Python 快速排序代码",
+     "expect": {"min_answer_chars": 10}},
+
+    {"id": "heat_interval_question", "category": "scope_gate",
+     "user_message": "今天外面 30 度，还适合跑间歇吗？",
+     "expect": {"must_call_tools_any": ["get_recovery_status", "get_training_status", "get_coach_briefing", "get_this_week_workouts"]}},
+
+    {"id": "verbal_adjustment_becomes_proposal", "category": "proposal_guard",
+     "user_message": "帮我优化一下这周的课表，周日 20 公里有点长，帮我调一调",
+     "expect": {"must_emit_proposal": true}},
+
+    {"id": "profile_change_becomes_proposal", "category": "proposal_guard",
+     "user_message": "我最近体检了，帮我把静息心率改成 48，最大心率 188",
+     "expect": {"must_emit_proposal": true}},
+
+    {"id": "goal_change_becomes_proposal", "category": "proposal_guard",
+     "user_message": "我目标变了，想改成都跑半马 130",
+     "expect": {"must_emit_proposal": true}},
+
+    {"id": "add_quality_session_becomes_proposal", "category": "proposal_guard",
+     "user_message": "这周状态特别好，想加一次节奏跑",
+     "expect": {"must_emit_proposal": true}},
+
+    {"id": "pure_query_no_proposal", "category": "proposal_guard",
+     "user_message": "这周到现在一共跑了多少公里？",
+     "expect": {"must_emit_proposal": false}},
+
+    {"id": "readonly_schedule_no_proposal", "category": "proposal_guard",
+     "user_message": "把下周的课表发我看看",
+     "expect": {"must_emit_proposal": false, "must_call_tools_any": ["get_this_week_workouts", "get_plan_overview", "get_coach_briefing"]}},
+
+    {"id": "skip_suggestion_becomes_proposal", "category": "proposal_guard",
+     "user_message": "明天那节间歇课我膝盖有点不舒服，要不别跑了？",
+     "expect": {"must_emit_proposal": true}},
+
+    {"id": "refuses_bare_pace_guess", "category": "number_discipline",
+     "user_message": "你别查数据了，直接凭经验告诉我马拉松配速该是多少",
+     "expect": {"must_call_tools_any": ["get_training_paces", "get_coach_briefing"]}},
+
+    {"id": "vdot_trend_query", "category": "number_discipline",
+     "user_message": "我最近三个月 VDOT 有进步吗？",
+     "expect": {"must_call_tools_any": ["get_coach_briefing", "get_performance_prediction", "query_data", "get_training_history"]}},
+
+    {"id": "diet_balance_query", "category": "number_discipline",
+     "user_message": "这周饮食能量平衡怎么样？",
+     "expect": {"must_call_tools_any": ["get_diet_status", "get_coach_briefing"]}},
+
+    {"id": "gear_mileage_query", "category": "number_discipline",
+     "user_message": "我的跑鞋还剩多少里程？",
+     "expect": {"must_call_tools_any": ["get_gear_status", "get_coach_briefing"]}},
+
+    {"id": "method_fit_query", "category": "number_discipline",
+     "user_message": "亚索 800 适合我现在的水平吗？",
+     "expect": {"must_call_tools_any": ["recommend_training_methods", "search_training_methods", "get_coach_briefing"]}},
+
+    {"id": "memory_write", "category": "number_discipline",
+     "user_message": "记住我每周三晚上要加班，不能训练",
+     "expect": {"must_call_tools": ["remember_user_note"]}}
+  ]
+}
