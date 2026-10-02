@@ -36,6 +36,17 @@ def active_plan(db: Session) -> models.TrainingPlan | None:
                      .order_by(models.TrainingPlan.id.desc()))
 
 
+def active_goal(db: Session, athlete_id: int) -> models.Goal | None:
+    """当前活动目标（同档案多条时取最早创建的一条，统一查询口径）。
+
+    此前「select Goal where active order by id」在 services 里复制了六份才收敛到这里；
+    新增读目标的调用方一律走本函数，暂停/列举全部目标的场景自行查询。
+    """
+    return db.scalar(select(models.Goal).where(
+        models.Goal.athlete_id == athlete_id, models.Goal.status == "active")
+        .order_by(models.Goal.id))
+
+
 def archive_plan(db: Session, plan: models.TrainingPlan) -> None:
     """归档计划，并清掉它「尚未执行」的课次（不 commit，由调用方统一提交）。
 
@@ -116,7 +127,7 @@ def activities_dicts(db: Session, athlete_id: int, days: int = 190,
         "avg_cadence": r.avg_cadence, "avg_power": r.avg_power,
         "training_load": r.training_load,
         "effort_score": r.effort_score, "elevation_m": r.elevation_m or 0,
-        "calories": r.calories,
+        "calories": r.calories, "temp_c": r.temp_c,
         "kind": (r.raw or {}).get("kind", ""),
     } for r in rows]
     if include_raw:
@@ -420,8 +431,7 @@ def runner_type_payload(db: Session, athlete: models.Athlete,
 
     pred = pred if pred is not None else build_prediction(db, athlete.id)
     acts = acts if acts is not None else activities_dicts(db, athlete.id, days=28)
-    goal = db.scalar(select(models.Goal).where(models.Goal.athlete_id == athlete.id,
-                                               models.Goal.status == "active"))
+    goal = active_goal(db, athlete.id)
     return runner_type_svc.classify_runner(
         athlete_dict(athlete), pred, weekly_km(acts), has_goal=goal is not None)
 
@@ -468,15 +478,15 @@ def build_evaluation(db: Session, athlete: models.Athlete, with_persist: bool = 
         "predictions": {k: p for k, p in pred.predictions.items()},
         "critical_speed": pred.critical_speed,
         "data_quality": pred.data_quality,
+        # 结构化质量明细（样本数/校准对数/CS 拟合 R²）：数据质量行按它渲染，
+        # 只给 data_quality 字符串的话前端拿不到数字
+        "quality": dict(pred.quality),
     }
 
     # 短板分析
     from .services import weakness as weakness_svc
 
-    goal_row = db.scalars(
-        select(models.Goal).where(models.Goal.athlete_id == athlete.id, models.Goal.status == "active")
-        .order_by(models.Goal.id)
-    ).first()
+    goal_row = active_goal(db, athlete.id)
     goal = None
     if goal_row:
         goal = {"race_type": goal_row.race_type, "target_time_sec": goal_row.target_time_sec,

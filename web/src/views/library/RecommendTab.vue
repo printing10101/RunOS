@@ -78,9 +78,9 @@
             </ul>
             <el-collapse class="plan-detail">
               <el-collapse-item :title="'计划骨架（' + it.plan.key_workouts?.length + ' 项关键课）'">
-                <div class="plan-block" v-if="weekTemplateText(it.plan).length">
+                <div class="plan-block" v-if="weekTemplateText(it.plan)">
                   <div class="pb-title">周模板</div>
-                  <div class="pb-body">{{ weekTemplateText(it.plan).join(' · ') }}</div>
+                  <div class="pb-body">{{ weekTemplateText(it.plan) }}</div>
                 </div>
                 <div class="plan-block" v-if="longRunText(it.plan)">
                   <div class="pb-title">长距离递进</div>
@@ -124,8 +124,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../../api'
-import { phaseName } from '../../utils/common'
+import { phaseName, raceTypeName } from '../../utils/common'
 import RollNum from '../../components/RollNum.vue'
+import { evTagType, levelLabel, weekTemplateText, longRunText } from './shared'
 
 const router = useRouter()
 const loading = ref(true)
@@ -134,40 +135,14 @@ const plans = ref(null)    // 计划匹配
 const applyingCode = ref(null)      // 正在生成体验周的方法 code
 const currentMethodCode = ref(null) // 当前 active 计划若由某方法生成，记其 code
 
-const LEVEL = { beginner: '入门', intermediate: '进阶', advanced: '高级', elite: '精英' }
-const RACE = { '5k': '5K', '10k': '10K', hm: '半马', marathon: '全马' }
-const WK = { mon: '一', tue: '二', wed: '三', thu: '四', fri: '五', sat: '六', sun: '日' }
-const SESSION = {
-  easy: '轻松跑', easy_short: '短轻松跑', recovery: '恢复跑', recovery_cross: '恢复/交叉',
-  tempo: '节奏跑', interval: '间歇', long: '长距离', long_pace: '带配速长距离', long_with_mp: '马配长距离',
-  medium_long: '中长距离', medium_long_or_LT: '中长距离/阈值', LT_or_VO2max: '阈值/VO2max',
-  general_aerobic: '一般有氧', speed_sos: '速度 SOS', tempo_or_mp_sos: '节奏/马配 SOS',
-  track_intervals: '跑道间歇', threshold_am: '阈值课(早)', threshold_pm: '阈值课(晚)',
-  quality_1: '质量课 Q1', quality_2: '质量课 Q2', strength: '力量', cross: '交叉训练',
-  race: '比赛', rest: '休息',
-}
-
-const levelLabel = v => LEVEL[v] || v
 // 目标口径与后端 build_athlete_profile 对齐：无手动目标时回退课表指向的比赛；
 // custom（高驰镜像）计划没有标准项目名，只显示排期日期，避免漏出原文 custom
 const goalText = computed(() => {
   const p = data.value?.profile
   if (!p?.race_type) return ''
-  const name = p.race_type === 'custom' ? '课表排期' : (RACE[p.race_type] || p.race_type)
+  const name = p.race_type === 'custom' ? '课表排期' : raceTypeName(p.race_type)
   return p.race_date ? `${name} · ${String(p.race_date).slice(5)}` : name
 })
-const evTagType = lv => ({ A: 'success', B: 'primary', C: 'warning', D: 'info' }[lv] || 'info')
-
-function weekTemplateText(plan) {
-  const wt = plan.week_template || {}
-  return Object.entries(wt)
-    .filter(([k, v]) => WK[k] && SESSION[v])
-    .map(([k, v]) => `周${WK[k]} ${SESSION[v]}`)
-}
-function longRunText(plan) {
-  const lr = plan.long_run_progression || []
-  return lr.map(x => `W${x.week}:${x.km}km${x.note ? `(${x.note})` : ''}`).join(' → ')
-}
 
 // 与 MethodsTab 的体验周入口同一端点：生成一周体验课表并替换当前计划（旧计划归档）
 async function applyWeek(method) {

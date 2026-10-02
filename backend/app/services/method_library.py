@@ -18,10 +18,9 @@ from sqlalchemy.orm import Session, selectinload
 from .. import models
 from ..data import active_plan, archive_plan
 from . import planner, vdot
-from .vocab import QUALITY_SESSION_TYPES
+from .vocab import QUALITY_SESSION_TYPES, WEEKDAY_CN
 
 ZONE_KEY_MAP = {"E": "easy", "M": "marathon", "T": "threshold", "I": "interval", "R": "repetition"}
-WEEKDAY_CN = ["一", "二", "三", "四", "五", "六", "日"]
 
 EVIDENCE_SCORE = {"A": 8.0, "B": 5.0, "C": 2.0, "D": 0.0}
 LEVEL_ORDER = ["beginner", "intermediate", "advanced", "elite"]
@@ -98,26 +97,23 @@ def method_summary(m: models.TrainingMethod) -> dict:
 # ---------------------------------------------------------------- 跑者画像（全部来自真实数据，不用默认值）
 
 def build_athlete_profile(db: Session, athlete: models.Athlete) -> dict:
-    from datetime import date, timedelta
-
-    from ..data import activities_dicts, weekly_km
+    from ..data import active_goal, activities_dicts, weekly_km
 
     acts = activities_dicts(db, athlete.id, days=28)
     week_km = round(weekly_km(acts), 1) if acts else 0.0
     slots = db.scalars(select(models.WeeklySlot).where(
         models.WeeklySlot.athlete_id == athlete.id,
         models.WeeklySlot.kind == "available")).all()
-    goal = db.scalar(select(models.Goal).where(
-        models.Goal.athlete_id == athlete.id, models.Goal.status == "active")
-        .order_by(models.Goal.id))
+    goal = active_goal(db, athlete.id)
     plan = active_plan(db)
     phase = None
     if plan:
-        today = date.today()
-        cur = next((w for w in plan.weeks if w.start_date <= today < w.start_date + timedelta(days=7)), None)
+        today = _dt.date.today()
+        cur = next((w for w in plan.weeks
+                    if w.start_date <= today < w.start_date + _dt.timedelta(days=7)), None)
         phase = cur.phase if cur else None
     # 伤病史信号：近 14 天打卡的酸痛与疼痛部位（主观通道，无数据则为 False）
-    since = date.today() - timedelta(days=14)
+    since = _dt.date.today() - _dt.timedelta(days=14)
     checks = db.scalars(select(models.DailyCheckin).where(
         models.DailyCheckin.athlete_id == athlete.id,
         models.DailyCheckin.date >= since)).all()
@@ -544,7 +540,6 @@ def build_week_plan_from_method(db: Session, athlete: models.Athlete, method_cod
     - 配速全部由当前 VDOT 解析，距离按周跑量与时段双重约束缩放。
     """
     from ..data import build_prediction
-    from . import planner
 
     m = get_method(db, method_code)
     if not m:
@@ -578,7 +573,7 @@ def build_week_plan_from_method(db: Session, athlete: models.Athlete, method_cod
     # 因此这里把窗口起点对齐到周一：若「明天」就是周一，则明天即开窗（不等待）；
     # 否则顺延到下一个周一，保证 7 个时段严格落在同一自然周内。
     tomorrow = _dt.date.today() + _dt.timedelta(days=1)
-    window_start = tomorrow - _dt.timedelta(days=tomorrow.weekday())
+    window_start = planner.week_start(tomorrow)
     if window_start < tomorrow:
         window_start += _dt.timedelta(days=7)
     # days_sorted 保持「时段时长降序」：长距离取 days_sorted[0]、质量课取次长的语义，
@@ -682,8 +677,7 @@ def build_week_plan_from_method(db: Session, athlete: models.Athlete, method_cod
         _emit(long_day, "long", title, steps, "按你当前跑量 35% 封顶的通用长距离", "planner.generic_long")
 
     # ---- 质量课（次长时段日，模板不重复，放不下先减组再换）----
-    quality_days = [d for d in days_sorted[1:]][:n_quality]
-    qi = 0
+    quality_days = days_sorted[1:1 + n_quality]
     for day in quality_days:
         placed = False
         for t in quality_pool:
@@ -696,10 +690,9 @@ def build_week_plan_from_method(db: Session, athlete: models.Athlete, method_cod
                 placed = True
                 break
         if not placed:
-            notes.append(f"周{WEEKDAY_CN[day['weekday']]}的可用时段不足，该日质量课改为轻松跑")
+            notes.append(f"{WEEKDAY_CN[day['weekday']]}的可用时段不足，该日质量课改为轻松跑")
             _, title, steps, _, _ = planner.build_easy_run(pred.current_vdot, 4.0)
             _emit(day, "easy", title, steps, "时段不足以完成质量课，降级为轻松跑", "planner.generic_easy")
-        qi += 1
 
     # ---- 其余日期：轻松跑（优先用体系自己的模板；按日期先后补位，输出保持时序）----
     used_days = {w["date"] for w in workouts}

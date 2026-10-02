@@ -1,0 +1,92 @@
+{
+ "meta": {
+  "file": "training_principles_extra.json",
+  "scope": "原理库补充：水合与钠 / 咖啡因 / 骨应力损伤预防 / 赛前糖原负荷",
+  "collected_at": "2026-09-29",
+  "collected_by": "公开文献与指南核对",
+  "disclaimer": "证据等级 A=随机对照试验/系统综述，B=观察性研究或精英训练日志统计，C=一手实践记录，D=二手媒体转述。"
+ },
+ "principles": [
+  {
+   "code": "hydration-sodium",
+   "name_zh": "水合与钠策略",
+   "name_en": "Hydration & Sodium Strategy",
+   "category": "nutrition",
+   "summary": "脱水超过体重的 2% 即可测量到耐力表现下降，但补水过量的低钠血症同样致命——水合策略的核心是「按出汗率补」，而不是固定饮多少。汗液里同时流失钠，长时间高温课/比赛只喝白水会增加低钠风险。",
+   "mechanism": "出汗散热使血浆容量下降、心率漂移上升，核心温度随之升高，同等配速的主观负荷变大。钠决定血浆渗透压与口渴感受：补钠能维持饮水欲望并减少尿液流失，过量纯水则稀释血钠，严重时致细胞水肿。",
+   "practical_rules": [
+    "按出汗率定补给量：长课前称重（前后差 ≈ 汗量），常见区间每小时 400-800ml",
+    "超过 90 分钟的课或高温天，补钠 300-600mg/小时（运动饮料/盐丸）",
+    "赛前 2 小时分次喝水 5-7ml/kg，让身体有时间排出多余部分",
+    "口渴是滞后信号，但按渴感喝也远好于按表硬灌——别强制灌水"
+   ],
+   "platform_usage": "暂未硬性落地：湿热天的配速降档由引擎处理，水合提醒目前依赖打卡备注与教练口头建议；可在长距离课前手动执行称重法",
+   "evidence_level": "B",
+   "evidence_note": "脱水 2% 降表现与个体出汗率差异来自大量观察与实验室研究（ACSM 立场综述口径）；低钠血症与过量纯水的关联有多起赛事病例报告。具体数字区间为指南通用口径，个体需用称重法自校。",
+   "sources": [
+    {"title": "ACSM Position Stand: Exercise and Fluid Replacement", "url": "https://pubmed.ncbi.nlm.nih.gov/17277604/", "source_type": "guideline", "year": 2007, "level": "A", "note": "指南立场声明：按出汗率个体化补水、长时间运动补钠的原始出处"}
+   ]
+  },
+  {
+   "code": "caffeine-ergogenic",
+   "name_zh": "咖啡因的耐力增益",
+   "name_en": "Caffeine as an Endurance Ergogenic Aid",
+   "category": "nutrition",
+   "summary": "咖啡因是证据最充分的耐力增补剂之一：3-6mg/kg（约一杯到两杯浓咖啡的量）在赛前 30-60 分钟摄入，对 5 分钟以上项目的表现平均提升 2-3%。个体反应差异大（CYP1A2 基因型、习惯摄入量），必须先在训练里试，比赛才第一次用是大忌。",
+   "mechanism": "咖啡因是腺苷受体拮抗剂：降低主观疲劳感与疼痛感知，并可能提高脂肪氧化占比、节约肌糖原。作用于中枢而非肌肉，因此对「感觉更累」的心理通道贡献最大。",
+   "practical_rules": [
+    "剂量 3-6mg/kg，赛前 30-60 分钟摄入；先从 3mg/kg 试起",
+    "训练期至少试 2-3 次验证肠胃反应与主观效果，再用于比赛",
+    "下午/晚上的课慎用：半衰期 4-6 小时，会挤压当晚睡眠（与 sleep-recovery-monitoring 冲突）",
+    "日常咖啡因习惯者效应减弱，赛周可小幅减量增敏，但不要完全戒断"
+   ],
+   "platform_usage": "暂未硬性落地：可在比赛日的打卡备注与教练对话中记录个体反应，沉淀为长期记忆",
+   "evidence_level": "A",
+   "evidence_note": "系统综述与荟萃分析充分支持 3-6mg/kg 对耐力表现的增益（ISSN 立场声明口径）；个体差异与基因分层的证据为 B 级。",
+   "sources": [
+    {"title": "International society of sports nutrition position stand: caffeine", "url": "https://pubmed.ncbi.nlm.nih.gov/33599155/", "source_type": "guideline", "year": 2021, "level": "A", "note": "ISSN 立场声明：剂量区间、时点与个体差异的权威综述"}
+   ]
+  },
+  {
+   "code": "bone-stress-injury-prevention",
+   "name_zh": "骨应力损伤预防",
+   "name_en": "Bone Stress Injury Prevention",
+   "category": "load",
+   "summary": "骨应力损伤（BSI，从骨膜反应到应力性骨折）是跑者最昂贵的伤病：恢复期 6-12 周起步，且几乎总是「负荷给得太快 + 能量吃得太少」的组合结果。骨骼重建以月为单位，肌肉以周为单位——腿不酸了不等于骨头跟上了。",
+   "mechanism": "反复低量冲击触发骨微损伤，正常情况下重建超过损伤（Wolff 定律）。跑量/强度突变、能量可得性不足（低能量可得性会压制骨重建激素环境）或连续高冲击周会把平衡推向损伤侧。胫骨、跖骨、股骨颈是跑者高发位。",
+   "practical_rules": [
+    "跑量增幅守渐进超负荷口径（≤10%/周），新鞋型/新路面也计入负荷变化",
+    "能量可得性守住（见 energy-availability 条目）：节食+加量的组合是 BSIs 的头号配方",
+    "危险信号：局部一点固定痛、越跑越重、走路也痛、夜间痛——立即停跑就医，与普通肌肉酸痛（双侧、晨起、两三天消退）区分",
+    "既往 BSIs 或月经失调/体脂骤降者，把每周增幅砍半并补钙 1000mg+/维 D 800IU+"
+   ],
+   "platform_usage": "打卡的疼痛部位通道（pain_area）已在伤病史信号里用于推荐降档；「局部一点痛即停跑就医」由教练口径执行，平台不自动诊断",
+   "evidence_level": "B",
+   "evidence_note": "危险因素（跑量突变、能量可得性、女运动员三联征谱系）来自大规模观察性研究与军警新兵队列（干预证据 A 级但人群不同）；「局部固定痛/夜间痛」为临床共识口径。",
+   "sources": [
+    {"title": "Bone Stress Injuries in Runners (Part 1-2 综述, Sports Medicine 系列)", "url": "https://pubmed.ncbi.nlm.nih.gov/29322323/", "source_type": "review", "year": 2018, "level": "B", "note": "跑者 BSI 危险因素与分期管理的系统综述；营养轴与能量可得性联动"}
+   ]
+  },
+  {
+   "code": "carb-loading-race-week",
+   "name_zh": "赛前糖原负荷（Carb Loading）",
+   "name_en": "Carbohydrate Loading for Race Week",
+   "category": "nutrition",
+   "summary": "赛前 36-48 小时把碳水吃到 8-12g/kg 体重，可把肌糖原储量拉高 50% 以上，直接推迟全马/半马撞墙点。关键细节是「减量训练 ≠ 减碳水」——最后几天跑得少但糖要吃满；糖原每存 1g 同步锁 3g 水，体重涨 1-2kg 是正常且理想的现象。",
+   "mechanism": "耐力运动的撞墙本质是肌糖原耗竭后被迫切换脂肪供能（输出功率上限骤降）。超补偿需要「糖负荷 + 低糖原消耗窗口」同时成立：训练减量腾出糖原空间，高碳水供给把它填满。现代短时方案（36-48h 高糖）已证明可替代 1980 年代 7 天耗竭-负荷方案。",
+   "practical_rules": [
+    "全马：赛前 36-48h 起按 8-12g/kg/天吃碳水（60kg 跑者 ≈ 500-700g，比日常多得多）",
+    "半马及以下：正常吃到 7-8g/kg 即可，无需激进负荷",
+    "负荷期选低纤维低脂的碳水来源（白米饭/面条/面包/果汁），减少肠道残渣",
+    "体重涨 1-2kg 别慌：糖原 1g 带 3g 水，比赛日它就是水合储备",
+    "比赛日 breakfast 3-4 小时前：1-2g/kg 碳水，熟悉的食物"
+   ],
+   "platform_usage": "暂未硬性落地：比赛周前的负荷方案可在 AI 教练对话里按体重与目标项目个性化（工具 get_diet_status 可查当日摄入）",
+   "evidence_level": "A",
+   "evidence_note": "糖原超补偿对 90 分钟以上项目表现的增益是经典 RCT 领域；36-48h 短时方案同样有对照研究支持（Bussau et al. 2002）。数字区间为指南口径，个体肠胃耐受需训练期演练。",
+   "sources": [
+    {"title": "Carbohydrate-loading in 6 days versus 3 days (Bussau et al., Med Sci Sports Exerc)", "url": "https://pubmed.ncbi.nlm.nih.gov/11828246/", "source_type": "rct", "year": 2002, "level": "A", "note": "3 天 10g/kg 方案与 6 天耗竭-负荷方案效果相当，确立现代短时糖负荷口径"}
+   ]
+  }
+ ]
+}

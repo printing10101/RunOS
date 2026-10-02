@@ -1,0 +1,454 @@
+{
+ "meta": {
+  "file": "training_methods_extra.json",
+  "scope": "全球流派补充：法特莱克 / 亚索800 / Hudson 自适应 / FIRST / Pfitzinger / Galloway（路由关键词与工具描述里点名、但库里此前缺失的条目）",
+  "collected_at": "2026-09-29",
+  "collected_by": "公开文献与原书目录核对",
+  "disclaimer": "证据等级 A=随机对照试验/系统综述，B=观察性研究或精英训练日志统计，C=一手实践记录，D=二手媒体转述。书目类出处一律以原书为准，url 留空并在 note 里标注书目信息，不编造链接。"
+ },
+ "methods": [
+  {
+   "code": "fartlek-classic",
+   "name_zh": "法特莱克（速度游戏）",
+   "name_ja": "ファルトレク（スピードプレイ）",
+   "name_en": "Fartlek (Speed Play)",
+   "origin": "western",
+   "category": "system",
+   "summary": "1930 年代瑞典教练 Gösta Holmér 为重振瑞典长跑设计的「速度游戏」：在连续的有氧跑中凭地形与体感随意穿插不等长的加速段（追一个路灯、冲一个上坡、变速咬住对手），不设跑道、不数组数。优点是趣味性强、变速贴近实战、对跑步经济性与心理韧性有额外收益；缺点是强度主观、难以量化复盘，一般不单独作为备赛主框架，而是作为 Daniels/MAF 等结构化体系在基础期的速度补充。",
+   "principles": [
+    "连续有氧底子上随机变速，兼得基础耐力与速度刺激",
+    "不看表：加速段的长短与次数由地形和体感决定",
+    "加速段到「略喘但可控」即可，不追求固定配速",
+    "课仍是「一节连续的跑」，加速之间不走路、不停表"
+   ],
+   "intensity_distribution": {"low": 70, "moderate": 20, "high": 10},
+   "weekly_km_range": {"min": 20, "max": 100},
+   "sessions_per_week": {"min": 3, "max": 7},
+   "quality_days_per_week": 1,
+   "level": "beginner",
+   "target_races": ["5k", "10k", "hm", "marathon"],
+   "phases": ["base", "build"],
+   "pros": "趣味性与自由度高，是最容易坚持的速度刺激形式；地形变速对跑步经济性、力量和心理韧性有额外收益；对场地零要求",
+   "cons": "强度靠体感，量化与复盘困难；没有明确周期结构，不能单独支撑备赛；节奏感差的跑者容易把加速段跑成全力冲刺",
+   "cautions": "基础期每周至多 1 次；有伤病史者避免硬地全速段，改上坡变速；与 MAF/慢跑法组合时法特莱克是唯一的质量课",
+   "key_figures": ["Gösta Holmér（瑞典国家队教练）", "Gunder Hägg（1940 年代用该法屡破世界纪录）"],
+   "tags": ["法特莱克", "速度游戏", "体感训练", "入门友好", "基础期"],
+   "evidence_level": "C",
+   "evidence_note": "一手实践记录为主：Gunder Hägg 时代的战绩是历史事实，但缺乏与其他课型结构的对照研究；现代对「fartlek 类非结构化变速」的研究多并入间歇训练证据，无法单独立论。",
+   "asian_fit": 72,
+   "asian_fit_basis": {
+    "culture": "「法特莱克」一词已进入中文跑步圈常用语，城市路跑人群易上手",
+    "time": "单课 30-60 分钟弹性大，适合通勤跑与下班夜跑",
+    "climate": "湿热季把加速段压短、段间恢复拉长即可，无需改课型",
+    "physique": "不涉及",
+    "note": "常与川内式/MAF 组合：有氧底子交给后两者，速度刺激用法特莱克补"
+   },
+   "workouts": [
+    {
+     "code": "fartlek-terrain-40",
+     "name_zh": "地形法特莱克 40 分钟",
+     "name_ja": "地形ファルトレク 40 分",
+     "session_type": "fartlek",
+     "purpose": "在连续有氧跑里插入体感变速段，练速度切换与心理韧性",
+     "intensity_anchor": {"type": "hr", "from": 0.65, "to": 0.85, "label": "有氧底 + 体感加速段"},
+     "structure": [
+      {"step_type": "warmup", "name": "热身慢跑", "duration_type": "time", "duration_value": 10, "target": {"type": "hr", "from": 0.65, "to": 0.75, "label": "心率 65-75%"}, "note": ""},
+      {"step_type": "active", "name": "轻加速 1 分钟", "duration_type": "time", "duration_value": 1, "target": {"type": "hr", "from": 0.75, "to": 0.82, "label": "体感：略喘可控"}, "note": "选定前方目标（路灯/树）追过去"},
+      {"step_type": "rest", "name": "慢跑恢复", "duration_type": "time", "duration_value": 2, "target": {"type": "hr", "from": 0.0, "to": 0.75, "label": "回到能聊天"}, "note": "不停步"},
+      {"step_type": "active", "name": "加速 2 分钟", "duration_type": "time", "duration_value": 2, "target": {"type": "hr", "from": 0.75, "to": 0.85, "label": "体感：略喘可控"}, "note": ""},
+      {"step_type": "rest", "name": "慢跑恢复", "duration_type": "time", "duration_value": 3, "target": {"type": "hr", "from": 0.0, "to": 0.75, "label": "回到能聊天"}, "note": ""},
+      {"step_type": "active", "name": "上坡冲 45 秒", "duration_type": "time", "duration_value": 1, "target": {"type": "none", "label": "坡度定强度"}, "note": "找缓上坡，跑上顶即结束"},
+      {"step_type": "rest", "name": "慢跑恢复", "duration_type": "time", "duration_value": 3, "target": {"type": "hr", "from": 0.0, "to": 0.75, "label": "回到能聊天"}, "note": ""},
+      {"step_type": "active", "name": "加速 1 分钟", "duration_type": "time", "duration_value": 1, "target": {"type": "hr", "from": 0.75, "to": 0.85, "label": "体感：略喘可控"}, "note": ""},
+      {"step_type": "cooldown", "name": "冷身慢跑", "duration_type": "time", "duration_value": 8, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": "全程未计的加速段可自由加 1-2 组，总量不变"}
+     ],
+     "distance_km_range": {"min": 6, "max": 10},
+     "duration_min_range": {"min": 35, "max": 50},
+     "weekly_km_min": 0,
+     "phases": ["base", "build"],
+     "frequency_hint": "每周至多 1 次，替换当周一次轻松跑",
+     "progression": "先固定加速段 1 分钟，逐步拉到 3 分钟；组数不变",
+     "cautions": "加速段若喘到说不出单词，说明过了；恢复段必须真的慢下来",
+     "source_url": "https://en.wikipedia.org/wiki/Fartlek"
+    }
+   ],
+   "evidences": [
+    {"title": "Fartlek（维基百科：起源与 Holmér 训练法概述）", "url": "https://en.wikipedia.org/wiki/Fartlek", "source_type": "media", "year": null, "level": "D", "note": "二手转述：Gösta Holmér 1930 年代设计、Gunder Hägg 战绩为历史事实"}
+   ],
+   "fit_rules": [
+    {"code": "fl-base-fun", "weight": 15, "reason": "基础期缺速度刺激且容易无聊：法特莱克是门槛最低的变速课", "condition": {"level_in": ["beginner", "intermediate"], "phase_in": ["base"]}},
+    {"code": "fl-injury", "weight": -12, "reason": "有伤病信号：无结构的全速段冲击不可控，先用结构化节奏课替代", "condition": {"injury_sensitive": true}}
+   ]
+  },
+  {
+   "code": "yasso-800",
+   "name_zh": "亚索 800（马拉松预测课）",
+   "name_ja": "ヤッソ 800",
+   "name_en": "Yasso 800s",
+   "origin": "western",
+   "category": "session",
+   "summary": "Runner's World 名人堂跑者 Bart Yasso 流传开的民间经验课：800 米间歇的「分秒」成绩在数字上等于马拉松的「时分」目标（800m 跑 3 分 30 秒 ×10 组 → 民间说法对应全马 3 小时 30 分）。这个数字对应关系并无生理学依据（证据等级 D），但作为 800 米间歇课本身有效——同时刺激 VO2max 与速度耐力，适合马拉松备赛 build/peak 期穿插。平台口径：目标推定一律以 VDOT/成绩预测引擎为准，亚索 800 只作辅助质量课，不得用作成绩承诺。",
+   "principles": [
+    "800m 间歇同时压 VO2max 与速度耐力，是马拉松专项期少有的快段刺激",
+    "组间慢跑恢复 400m，节奏必须稳定（各组时差 ≤3 秒）",
+    "数字对应是巧合式经验，不是生理映射——预测交给引擎"
+   ],
+   "intensity_distribution": {"low": 60, "moderate": 20, "high": 20},
+   "weekly_km_range": {"min": 30, "max": 120},
+   "sessions_per_week": {"min": 4, "max": 7},
+   "quality_days_per_week": 1,
+   "level": "intermediate",
+   "target_races": ["marathon", "hm"],
+   "phases": ["build", "peak"],
+   "pros": "课型经典、场地要求低（跑道/路跑均可）；组间时差是简单可靠的自检指标",
+   "cons": "预测全马成绩的说法无科学依据，个体误差可达正负 10 分钟以上；对有氧底子不足者刺激过强",
+   "cautions": "每周至多 1 次；基础期不要安排；首次做 6 组，适应后再到 10 组",
+   "key_figures": ["Bart Yasso（Runner's World，AMI 跑步名人堂）"],
+   "tags": ["亚索", "亚索800", "800米间歇", "马拉松", "预测课"],
+   "evidence_level": "D",
+   "evidence_note": "预测关系为媒体流传的民间经验（Runner's World 栏目），无对照研究；800m 间歇本身的有效性由间歇训练研究间接支撑（见 vo2max-intervals 原理条目）。",
+   "asian_fit": 65,
+   "asian_fit_basis": {
+    "culture": "中文跑步圈按「亚索800」叫法广泛流传，社群打卡氛围好",
+    "time": "含热身冷身约 60-75 分钟，工作日晚上可完成",
+    "climate": "夏季湿热时按心率执行（I 区上限），不看表追数字",
+    "physique": "不涉及",
+    "note": "预测全马请用平台的 VDOT 引擎；本课只作 build/peak 期辅助刺激"
+   },
+   "workouts": [
+    {
+     "code": "yasso-800-classic",
+     "name_zh": "亚索 800（800m × 6）",
+     "name_ja": "ヤッソ 800（800m × 6）",
+     "session_type": "interval",
+     "purpose": "VO2max + 速度耐力；组间时差自检马拉松状态",
+     "intensity_anchor": {"type": "pace_zone", "zone": "I", "label": "I 配速（亚索口径按目标马配同数字，平台按 VDOT 解析）"},
+     "structure": [
+      {"step_type": "warmup", "name": "热身慢跑+动态拉伸", "duration_type": "time", "duration_value": 12, "target": {"type": "hr", "from": 0.65, "to": 0.75, "label": "心率 65-75%"}, "note": ""},
+      {"step_type": "active", "name": "800m ①", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": "目标数字=目标全马时分配速的同数字分钟/秒"},
+      {"step_type": "rest", "name": "慢跑 400m", "duration_type": "distance", "duration_value": 400, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": "不停表"},
+      {"step_type": "active", "name": "800m ②", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": ""},
+      {"step_type": "rest", "name": "慢跑 400m", "duration_type": "distance", "duration_value": 400, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": ""},
+      {"step_type": "active", "name": "800m ③", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": ""},
+      {"step_type": "rest", "name": "慢跑 400m", "duration_type": "distance", "duration_value": 400, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": ""},
+      {"step_type": "active", "name": "800m ④", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": ""},
+      {"step_type": "rest", "name": "慢跑 400m", "duration_type": "distance", "duration_value": 400, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": ""},
+      {"step_type": "active", "name": "800m ⑤", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": ""},
+      {"step_type": "rest", "name": "慢跑 400m", "duration_type": "distance", "duration_value": 400, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": ""},
+      {"step_type": "active", "name": "800m ⑥", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": ""},
+      {"step_type": "cooldown", "name": "冷身慢跑", "duration_type": "time", "duration_value": 10, "target": {"type": "hr", "from": 0.0, "to": 0.65, "label": "心率 <65%"}, "note": "适应后按 progression 加到 10 组"}
+     ],
+     "distance_km_range": {"min": 10, "max": 16},
+     "duration_min_range": {"min": 55, "max": 80},
+     "weekly_km_min": 30,
+     "phases": ["build", "peak"],
+     "frequency_hint": "每周至多 1 次",
+     "progression": "6 组起步，每 2-3 周加 1 组至 10 组；组间时差控制在 3 秒内",
+     "cautions": "若组间时差持续变大，是疲劳信号，当周其余质量课降档",
+     "source_url": "https://en.wikipedia.org/wiki/Bart_Yasso"
+    }
+   ],
+   "evidences": [
+    {"title": "Bart Yasso（维基百科：亚索 800 的由来与传播）", "url": "https://en.wikipedia.org/wiki/Bart_Yasso", "source_type": "media", "year": null, "level": "D", "note": "预测关系为民间经验转述；Runner's World 为原始传播渠道"}
+   ],
+   "fit_rules": [
+    {"code": "ys-build-peak", "weight": 12, "reason": "马拉松/半马备赛进入专项期：需要快段刺激维持 VO2max", "condition": {"race_in": ["marathon", "hm"], "phase_in": ["build", "peak"]}},
+    {"code": "ys-beginner", "weight": -10, "reason": "初跑者：800m 间歇冲击大，先把有氧底子打牢", "condition": {"level_in": ["beginner"]}}
+   ]
+  },
+  {
+   "code": "hudson-adaptive",
+   "name_zh": "Hudson 自适应体系",
+   "name_ja": "ハドソン・アダプティブ・システム",
+   "name_en": "Brad Hudson's Adaptive Running",
+   "origin": "western",
+   "category": "system",
+   "summary": "教练 Brad Hudson 在《Run Faster》里提出的「自己当自己的教练」体系：不套固定课表，而是按一套原则每周根据身体反馈调整。核心是倒置周期——从短速度（坡跑冲刺、短快段）起步，逐步拉长快段直到比赛专项距离，把「跑得快的耐力」留到赛季末；渐进跑（progression run，越跑越快）是招牌课型。优点是弹性大、贴个体状态；缺点是对跑者自我判断要求高，新手容易调错强度。",
+   "principles": [
+    "速度优先：先练短速度（坡跑/短快段），再逐步拉长快段",
+    "周期终点是「在疲劳下跑得快」，不是「能跑完」",
+    "每课按前一晚睡眠、酸痛与体感微调，课表服务于身体",
+    "渐进跑常态化：多数轻松课最后 5-10 分钟提速"
+   ],
+   "intensity_distribution": {"low": 72, "moderate": 18, "high": 10},
+   "weekly_km_range": {"min": 25, "max": 120},
+   "sessions_per_week": {"min": 4, "max": 7},
+   "quality_days_per_week": 2,
+   "level": "intermediate",
+   "target_races": ["5k", "10k", "hm", "marathon"],
+   "phases": ["base", "build", "peak"],
+   "pros": "弹性高，天然贴合本平台的打卡/HRV 反馈机制；渐进跑对比赛后程能力收益直接",
+   "cons": "没有现成课表可抄，自我调整的判断门槛高；倒置周期与主流结构差异大，转换期成绩可能暂退",
+   "cautions": "自我调整必须守底线：连续两天睡眠差/酸痛重就把质量课换成轻松跑；坡跑冲刺新手先 4 组",
+   "key_figures": ["Brad Hudson（教练，指导 Dathan Ritzenhein 等）", "与 Matt Fitzgerald 合著《Run Faster》(2008)"],
+   "tags": ["自适应", "倒置周期", "渐进跑", "坡跑", "自己当教练"],
+   "evidence_level": "C",
+   "evidence_note": "教练方法论与一手带训记录；其运动员战绩为个案，无对照研究比较倒置周期与经典周期。",
+   "asian_fit": 60,
+   "asian_fit_basis": {
+    "culture": "「自己当教练」理念与中文社区常见的跟表文化不同，需适应",
+    "time": "无固定时长，课型都可在 60 分钟内完成",
+    "climate": "湿热季把渐进跑的提速段缩短即可",
+    "physique": "坡跑冲刺对小腿跟腱负荷大，亚洲跑者跟腱伤病率不低，起步组数要保守",
+    "note": "与平台「打卡反馈→AI 建议降档」的闭环天然契合"
+   },
+   "workouts": [
+    {
+     "code": "hudson-progression-30",
+     "name_zh": "渐进跑 30 分钟（三分段）",
+     "name_ja": "プログレッション走 30 分",
+     "session_type": "tempo",
+     "purpose": "招牌课型：越跑越快，练疲劳下的速度保持与节奏感",
+     "intensity_anchor": {"type": "hr", "from": 0.65, "to": 0.88, "label": "分段提速：65%→88%"},
+     "structure": [
+      {"step_type": "warmup", "name": "轻松段", "duration_type": "time", "duration_value": 12, "target": {"type": "hr", "from": 0.65, "to": 0.72, "label": "心率 65-72%"}, "note": "能完整聊天"},
+      {"step_type": "active", "name": "中速段", "duration_type": "time", "duration_value": 10, "target": {"type": "hr", "from": 0.75, "to": 0.82, "label": "心率 75-82%"}, "note": "能说短句"},
+      {"step_type": "active", "name": "提速段", "duration_type": "time", "duration_value": 8, "target": {"type": "hr", "from": 0.82, "to": 0.88, "label": "心率 82-88%"}, "note": "接近 T 配速体感，收尾不看表靠感觉"},
+      {"step_type": "cooldown", "name": "冷身慢跑", "duration_type": "time", "duration_value": 8, "target": {"type": "hr", "from": 0.0, "to": 0.68, "label": "心率 <68%"}, "note": ""}
+     ],
+     "distance_km_range": {"min": 6, "max": 12},
+     "duration_min_range": {"min": 35, "max": 55},
+     "weekly_km_min": 25,
+     "phases": ["base", "build", "peak"],
+     "frequency_hint": "每周 1 次，可替换一次轻松跑",
+     "progression": "先拉长提速段（8→15 分钟），再整体拉长课时长",
+     "cautions": "提速段如果靠意志硬顶到腿软，说明中速段太快",
+     "source_url": ""
+    }
+   ],
+   "evidences": [
+    {"title": "Run Faster: How to Be Your Own Best Coach（Brad Hudson & Matt Fitzgerald）", "url": "", "source_type": "book", "year": 2008, "level": "C", "note": "书目出处：Shamrock imprint / 现行版本 Gotham Books；倒置周期与渐进跑原则见原书第二部分"}
+   ],
+   "fit_rules": [
+    {"code": "hd-self-coach", "weight": 12, "reason": "有稳定跑步习惯的进阶者：自适应原则可结合打卡数据自己微调", "condition": {"level_in": ["intermediate"], "weekly_km_min": 25}},
+    {"code": "hd-short-race", "weight": 10, "reason": "目标 5K/10K：速度优先的倒置周期对该距离更直接", "condition": {"race_in": ["5k", "10k"]}},
+    {"code": "hd-beginner", "weight": -12, "reason": "初跑者：自我调强度的判断门槛高，先跟结构化课表", "condition": {"level_in": ["beginner"]}}
+   ]
+  },
+  {
+   "code": "first-run-less-faster",
+   "name_zh": "FIRST 三课+交叉训练体系",
+   "name_ja": "FIRST 3ラン＋クロストレ",
+   "name_en": "FIRST (Run Less, Run Faster)",
+   "origin": "western",
+   "category": "system",
+   "summary": "美国 Furman 运动科学研究所（FIRST）的「Run Less, Run Faster」：每周只跑 3 次，但全是质量课——跑道间歇（周二）、节奏跑（周四）、中长距离（周末，马配 +30~45 秒/公里），另加 2 次交叉训练（自行车/游泳/椭圆机），配速全部按个人最新 5K 成绩查表锁定。适合时间紧、有交叉训练习惯或跑步冲击耐受差的进阶跑者；代价是 3 课全硬、没有轻松跑缓冲，对恢复能力与配速纪律要求极高。",
+   "principles": [
+    "每周 3 跑全为质量课：间歇 / 节奏 / 长距离，缺一不可",
+    "配速一律由 5K 成绩查表得出，不许凭体感改",
+    "交叉训练承担有氧量：不落地冲击，练到对应心率区",
+    "跑休日至少 1 天，交叉训练与质量课不同天连排"
+   ],
+   "intensity_distribution": {"low": 50, "moderate": 30, "high": 20},
+   "weekly_km_range": {"min": 25, "max": 70},
+   "sessions_per_week": {"min": 5, "max": 5},
+   "quality_days_per_week": 3,
+   "level": "intermediate",
+   "target_races": ["5k", "10k", "hm", "marathon"],
+   "phases": ["base", "build", "peak", "taper"],
+   "pros": "时间效率最高（跑步时间省出 2 天）；交叉训练降低冲击性伤病；结构刚性、执行清晰",
+   "cons": "3 课全是质量课、没有轻松跑缓冲，疲劳管理与配速纪律要求高；跑量低的跑者有氧底子相对薄",
+   "cautions": "质量课之间必须留至少 1 个非跑步日；交叉训练强度别偷偷超标；连续 2 周配速达不了表，整体降 5 秒/公里",
+   "key_figures": ["Bill Pierce / Scott Murr / Ray Moss（Furman 大学）"],
+   "tags": ["FIRST", "三课制", "交叉训练", "时间效率", "配速表"],
+   "evidence_level": "B",
+   "evidence_note": "FIRST 团队自报的准实验队列（单组前后测，改良 5 训练周）与大量用户实践；无随机对照组，样本自选，结论方向可信、幅度存疑。",
+   "asian_fit": 68,
+   "asian_fit_basis": {
+    "culture": "通勤族「没时间但想出成绩」的刚需场景高度匹配",
+    "time": "每周跑步仅 3 天，通勤/加班友好；交叉训练可骑车通勤代替",
+    "climate": "雨天/台风天交叉训练是天然替代，无需户外",
+    "physique": "落地冲击少对大体重大跑者友好，但节奏课强度需按体感上限校验",
+    "note": "配速表口径与平台 VDOT 五区一致，可直接映射到 T/I 区解析"
+   },
+   "workouts": [
+    {
+     "code": "first-track-800x6",
+     "name_zh": "FIRST 跑道课：800m × 6（5K 配速口径）",
+     "name_ja": "FIRST トラック 800m × 6",
+     "session_type": "interval",
+     "purpose": "周二跑道课：按配速表练 VO2max，锁定 5K 口径配速",
+     "intensity_anchor": {"type": "pace_zone", "zone": "I", "label": "按 5K 成绩查表（平台按 VDOT I 区解析）"},
+     "structure": [
+      {"step_type": "warmup", "name": "热身慢跑+动态拉伸", "duration_type": "time", "duration_value": 12, "target": {"type": "hr", "from": 0.65, "to": 0.75, "label": "心率 65-75%"}, "note": ""},
+      {"step_type": "active", "name": "800m ①", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": "严格按表，不许起跑抢速"},
+      {"step_type": "rest", "name": "慢跑 400m", "duration_type": "distance", "duration_value": 400, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": ""},
+      {"step_type": "active", "name": "800m ②", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": ""},
+      {"step_type": "rest", "name": "慢跑 400m", "duration_type": "distance", "duration_value": 400, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": ""},
+      {"step_type": "active", "name": "800m ③", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": ""},
+      {"step_type": "rest", "name": "慢跑 400m", "duration_type": "distance", "duration_value": 400, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": ""},
+      {"step_type": "active", "name": "800m ④", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": ""},
+      {"step_type": "rest", "name": "慢跑 400m", "duration_type": "distance", "duration_value": 400, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": ""},
+      {"step_type": "active", "name": "800m ⑤", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": ""},
+      {"step_type": "rest", "name": "慢跑 400m", "duration_type": "distance", "duration_value": 400, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": ""},
+      {"step_type": "active", "name": "800m ⑥", "duration_type": "distance", "duration_value": 800, "target": {"type": "pace_zone", "zone": "I"}, "note": ""},
+      {"step_type": "cooldown", "name": "冷身慢跑", "duration_type": "time", "duration_value": 10, "target": {"type": "hr", "from": 0.0, "to": 0.65, "label": "心率 <65%"}, "note": ""}
+     ],
+     "distance_km_range": {"min": 10, "max": 14},
+     "duration_min_range": {"min": 55, "max": 75},
+     "weekly_km_min": 25,
+     "phases": ["base", "build", "peak"],
+     "frequency_hint": "每周二，3 质量课之一",
+     "progression": "周期内 800m 组数 5→6→7，或换 1000m/1600m 组",
+     "cautions": "配速纪律是本课型的灵魂：达不了表说明当前 5K 成绩已过时，重测再查表",
+     "source_url": ""
+    }
+   ],
+   "evidences": [
+    {"title": "Run Less, Run Faster（Bill Pierce, Scott Murr, Ray Moss；Furman Institute）", "url": "", "source_type": "book", "year": 2007, "level": "C", "note": "书目出处：Rodale Press（现行版本 BenBella Books）；3 跑+2 交叉结构与配速表见原书"}
+   ],
+   "fit_rules": [
+    {"code": "ft-days-tight", "weight": 15, "reason": "可练天数少（≤4 天）：3 跑+2 交叉的结构正好填满有限日程", "condition": {"days_max": 4, "weekly_km_min": 20}},
+    {"code": "ft-injury", "weight": 10, "reason": "有伤病信号：交叉训练替代部分落地冲击", "condition": {"injury_sensitive": true}},
+    {"code": "ft-beginner", "weight": -12, "reason": "初跑者：3 课全硬、没有轻松跑缓冲，恢复压力大", "condition": {"level_in": ["beginner"]}}
+   ]
+  },
+  {
+   "code": "pfitzinger-advanced",
+   "name_zh": "Pfitzinger 进阶马拉松体系",
+   "name_ja": "フィッツィンガー・アドバンスド・マラソニング",
+   "name_en": "Pfitzinger Advanced Marathoning",
+   "origin": "western",
+   "category": "system",
+   "summary": "奥运马拉松选手 Pete Pfitzinger 在《Advanced Marathoning》里的中高跑量体系：以马拉松专项为核心，特点是大比例「中长距离」（周二/周四 11-26km 的 medium-long run，其中一场带马拉松配速段）、VO2max 课放在周期早段而把 MP 课与长距离留在专项期收尾；每周 5-6 跑。适合已有 1-2 个全马经历、周跑量 55km+、想突破成绩的进阶者。平台已有其 18/55 与 18/70 两套参考计划，本条目是体系级说明。",
+   "principles": [
+    "中长距离是核心课型：每周 2 次 11-26km，含 MP 段",
+    "VO2max 课前置（周期早段），MP 与长距离后置贴近比赛",
+    "跑量台阶式上升，每 3-4 周一个减量周",
+    "恢复周也保持 5 天以上跑步频率，靠距离而非天数减负荷"
+   ],
+   "intensity_distribution": {"low": 68, "moderate": 24, "high": 8},
+   "weekly_km_range": {"min": 55, "max": 130},
+   "sessions_per_week": {"min": 5, "max": 7},
+   "quality_days_per_week": 2,
+   "level": "advanced",
+   "target_races": ["marathon"],
+   "phases": ["base", "build", "peak", "taper"],
+   "pros": "马拉松专项针对性极强；中长距离+MP 段的组合对后程掉速改善直接；周期结构清晰可执行",
+   "cons": "跑量门槛高；课量大、恢复吃紧，工作日排不出 90 分钟以上课时的跑者难以完整执行",
+   "cautions": "先满足周跑量 55km 再考虑；MP 段配速必须保守（当前状态对应的目标，而非梦想目标）",
+   "key_figures": ["Pete Pfitzinger（1984/1988 奥运马拉松选手）", "与 Scott Douglas 合著《Advanced Marathoning》"],
+   "tags": ["进阶马拉松", "中长距离", "马配课", "高跑量", "专项期"],
+   "evidence_level": "C",
+   "evidence_note": "教练方法论与作者本人奥运级实践；其 VO2max 前置/MP 后置的排序是经验主张，无对照研究验证相对其他排序的优劣。",
+   "asian_fit": 58,
+   "asian_fit_basis": {
+    "culture": "国内进阶跑者对「P 计划」接受度高，跟表文化成熟",
+    "time": "工作日中长距离需要 70-110 分钟课时，通勤族执行难",
+    "climate": "夏季湿热期 MP 段按心率/体感校验，避免锁死配速",
+    "physique": "高跑量对骨骼肌肉恢复要求高，能量摄入不足会先受伤（见 energy-availability 原理）",
+    "note": "平台排课引擎可直接承载其周结构：中长距离课用 M 区 + 偏移解析"
+   },
+   "workouts": [
+    {
+     "code": "pfitz-mp-medium-long",
+     "name_zh": "中长距离 + MP 段（16km 含 8km 马配）",
+     "name_ja": "ミドルロング + MP 区間",
+     "session_type": "long",
+     "purpose": "Pfitzinger 核心课型：在疲劳累积下锁马拉松配速",
+     "intensity_anchor": {"type": "pace_zone", "zone": "M", "label": "MP 段用马拉松目标配速"},
+     "structure": [
+      {"step_type": "warmup", "name": "轻松段", "duration_type": "distance", "duration_value": 6000, "target": {"type": "hr", "from": 0.65, "to": 0.75, "label": "心率 65-75%"}, "note": ""},
+      {"step_type": "active", "name": "马拉松配速段", "duration_type": "distance", "duration_value": 8000, "target": {"type": "pace_zone", "zone": "M"}, "note": "严格 MP；进段前不加速，出段后不冲刺"},
+      {"step_type": "cooldown", "name": "放松段", "duration_type": "distance", "duration_value": 2000, "target": {"type": "hr", "from": 0.0, "to": 0.7, "label": "心率 <70%"}, "note": ""}
+     ],
+     "distance_km_range": {"min": 14, "max": 26},
+     "duration_min_range": {"min": 75, "max": 130},
+     "weekly_km_min": 55,
+     "phases": ["build", "peak"],
+     "frequency_hint": "每周 1 次（周三或周四），配合周末另一场中长距离",
+     "progression": "MP 段 6km → 10km → 16km，总距离同步拉长",
+     "cautions": "MP 段跑崩是目标定太高的信号，整体降 5-10 秒/公里",
+     "source_url": ""
+    }
+   ],
+   "evidences": [
+    {"title": "Advanced Marathoning（Pete Pfitzinger & Scott Douglas）", "url": "", "source_type": "book", "year": 2009, "level": "C", "note": "书目出处：Human Kinetics（第 2 版 2009 / 第 3 版 2019）；中长距离与 MP 课型见原书第 4-5 章"}
+   ],
+   "fit_rules": [
+    {"code": "pz-volume-gate", "weight": 15, "reason": "周跑量 55km 以上：中高跑量体系才吃得下", "condition": {"weekly_km_min": 55}},
+    {"code": "pz-marathon", "weight": 12, "reason": "目标全马且已有跑量基础：专项针对性最强的一档", "condition": {"race_in": ["marathon"], "level_in": ["intermediate", "advanced"]}},
+    {"code": "pz-beginner", "weight": -15, "reason": "初跑者/低跑量：课量超出当前恢复能力", "condition": {"level_in": ["beginner"]}}
+   ]
+  },
+  {
+   "code": "galloway-run-walk",
+   "name_zh": "Galloway 走跑法",
+   "name_ja": "ギャロウェイ・ランウォーク法",
+   "name_en": "Galloway Run-Walk-Run Method",
+   "origin": "western",
+   "category": "system",
+   "summary": "奥运万米选手、 Runner's World 专栏作家 Jeff Galloway 的走跑结合法（中文圈称盖洛威走跑法）：从第一天起就按固定节奏在跑步中插入步行段（新手 3 分钟跑+1 分钟走起步，比赛日按目标时长选 30 秒跑/30 秒走等比例），靠走段定期「重置」疲劳、压低单步冲击。Galloway 教练案例称可显著降低伤病并让完赛率提高，但没有对照研究支撑。适合零基础、体重偏大、伤后恢复期与超长距离完赛人群。",
+   "principles": [
+    "跑走交替从第一课就开始，不等累了才走",
+    "走段是策略不是失败：早期介入的走比重置晚的停更省",
+    "节奏固定比比例更重要，掐表执行",
+    "长距离课用走跑法把单次冲击打散"
+   ],
+   "intensity_distribution": {"low": 85, "moderate": 10, "high": 5},
+   "weekly_km_range": {"min": 5, "max": 40},
+   "sessions_per_week": {"min": 3, "max": 5},
+   "quality_days_per_week": 0,
+   "level": "beginner",
+   "target_races": ["5k", "10k", "hm", "marathon"],
+   "phases": ["base", "build", "race"],
+   "pros": "伤病与心理负担最低的跑步入门方式；超长距离里走段策略可显著稳住后程；对体重偏大人群冲击友好",
+   "cons": "无速度刺激，不能用于成绩突破；节奏依赖掐表或手表提醒，自由跑习惯者难维持",
+   "cautions": "走段必须真的走（不是慢摇）；心率偏高的跑者可把比例改成 1:1；本体系不与质量课同排",
+   "key_figures": ["Jeff Galloway（1972 奥运万米选手）"],
+   "tags": ["盖洛威", "走跑交替", "零基础", "完赛导向", "低冲击", "超马"],
+   "evidence_level": "C",
+   "evidence_note": "教练一手实践与学员案例统计（Galloway 官方口径称伤病率大幅低于持续跑人群），但为自报数据、无对照研究。",
+   "asian_fit": 78,
+   "asian_fit_basis": {
+    "culture": "走跑交替对「跑步=痛苦」的大众认知破冰效果好，适合社区推广",
+    "time": "单课 30-60 分钟，走段降低总课时需求",
+    "climate": "湿热季走跑节奏比持续跑更安全，热积聚慢",
+    "physique": "大体重大/关节病史人群最友好的一档",
+    "note": "与平台 C25K 走跑计划同向；体验周场景可直接用 galloway-run-walk-3-1 模板"
+   },
+   "workouts": [
+    {
+     "code": "galloway-run-walk-3-1",
+     "name_zh": "走跑交替 30 分钟（3 分跑 / 1 分走）",
+     "name_ja": "ランウォーク 30 分（3分走/1分歩）",
+     "session_type": "easy",
+     "purpose": "低冲击有氧：靠固定走段重置疲劳，维持连贯训练",
+     "intensity_anchor": {"type": "hr", "from": 0.6, "to": 0.72, "label": "心率 60-72%，全程能聊天"},
+     "structure": [
+      {"step_type": "warmup", "name": "热身步行", "duration_type": "time", "duration_value": 3, "target": {"type": "hr", "from": 0.0, "to": 0.65, "label": "慢走起步"}, "note": ""},
+      {"step_type": "active", "name": "跑 3 分钟", "duration_type": "time", "duration_value": 3, "target": {"type": "hr", "from": 0.6, "to": 0.72, "label": "能聊天"}, "note": ""},
+      {"step_type": "rest", "name": "走 1 分钟", "duration_type": "time", "duration_value": 1, "target": {"type": "hr", "from": 0.0, "to": 0.65, "label": "真的走"}, "note": ""},
+      {"step_type": "active", "name": "跑 3 分钟", "duration_type": "time", "duration_value": 3, "target": {"type": "hr", "from": 0.6, "to": 0.72, "label": "能聊天"}, "note": ""},
+      {"step_type": "rest", "name": "走 1 分钟", "duration_type": "time", "duration_value": 1, "target": {"type": "hr", "from": 0.0, "to": 0.65, "label": "真的走"}, "note": ""},
+      {"step_type": "active", "name": "跑 3 分钟", "duration_type": "time", "duration_value": 3, "target": {"type": "hr", "from": 0.6, "to": 0.72, "label": "能聊天"}, "note": ""},
+      {"step_type": "rest", "name": "走 1 分钟", "duration_type": "time", "duration_value": 1, "target": {"type": "hr", "from": 0.0, "to": 0.65, "label": "真的走"}, "note": ""},
+      {"step_type": "active", "name": "跑 3 分钟", "duration_type": "time", "duration_value": 3, "target": {"type": "hr", "from": 0.6, "to": 0.72, "label": "能聊天"}, "note": ""},
+      {"step_type": "rest", "name": "走 1 分钟", "duration_type": "time", "duration_value": 1, "target": {"type": "hr", "from": 0.0, "to": 0.65, "label": "真的走"}, "note": ""},
+      {"step_type": "active", "name": "跑 3 分钟", "duration_type": "time", "duration_value": 3, "target": {"type": "hr", "from": 0.6, "to": 0.72, "label": "能聊天"}, "note": ""},
+      {"step_type": "rest", "name": "走 1 分钟", "duration_type": "time", "duration_value": 1, "target": {"type": "hr", "from": 0.0, "to": 0.65, "label": "真的走"}, "note": ""},
+      {"step_type": "active", "name": "跑 3 分钟", "duration_type": "time", "duration_value": 3, "target": {"type": "hr", "from": 0.6, "to": 0.72, "label": "能聊天"}, "note": ""},
+      {"step_type": "rest", "name": "走 1 分钟", "duration_type": "time", "duration_value": 1, "target": {"type": "hr", "from": 0.0, "to": 0.65, "label": "真的走"}, "note": ""},
+      {"step_type": "cooldown", "name": "冷身步行+拉伸", "duration_type": "time", "duration_value": 3, "target": {"type": "hr", "from": 0.0, "to": 0.65, "label": "慢走收尾"}, "note": "按目标时长继续 3:1 循环至结束"}
+     ],
+     "distance_km_range": {"min": 3, "max": 8},
+     "duration_min_range": {"min": 25, "max": 60},
+     "weekly_km_min": 0,
+     "phases": ["base", "build", "race"],
+     "frequency_hint": "每周 3 次，隔天安排",
+     "progression": "跑段 3→4→5 分钟（走段恒 1 分钟）；比赛日按目标时长改用更短比例（如 30 秒:30 秒）",
+     "cautions": "走段一旦偷跑成慢摇，重置效果消失",
+     "source_url": "https://en.wikipedia.org/wiki/Jeff_Galloway"
+    }
+   ],
+   "evidences": [
+    {"title": "Jeff Galloway（维基百科：Run-Walk-Run 方法概述）", "url": "https://en.wikipedia.org/wiki/Jeff_Galloway", "source_type": "media", "year": null, "level": "D", "note": "方法框架为二手转述；伤病率主张来自 Galloway 官方自报数据，无对照研究"}
+   ],
+   "fit_rules": [
+    {"code": "gw-zero-base", "weight": 18, "reason": "周跑量很低/刚起步：走跑法是冲击最低的入门通道", "condition": {"weekly_km_max": 20}},
+    {"code": "gw-injury", "weight": 14, "reason": "有伤病信号：走段定期重置疲劳，降低单次冲击", "condition": {"injury_sensitive": true}},
+    {"code": "gw-advanced", "weight": -12, "reason": "进阶跑者：无速度刺激，对成绩突破没有增益", "condition": {"level_in": ["advanced"]}}
+   ]
+  }
+ ]
+}

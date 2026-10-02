@@ -117,6 +117,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../../api'
+import { evTagType, levelLabel, sessionLabel } from './shared'
 
 const router = useRouter()
 const items = ref([])
@@ -134,16 +135,10 @@ const filtered = computed(() => items.value.filter(m =>
   && (!fQuery.value || [m.name_zh, m.name_ja, m.name_en, m.summary, ...(m.tags || [])].join(' ').toLowerCase().includes(fQuery.value.toLowerCase()))
 ))
 
-const LEVEL = { beginner: '入门', intermediate: '进阶', advanced: '高级', elite: '精英' }
 const ORIGIN = { japan: '日本', asia: '亚洲', western: '西方', global: '全球' }
-const SESSION = { easy: '轻松跑', tempo: '节奏跑', interval: '间歇', long: '长距离', recovery: '恢复跑',
-                  fartlek: '变速跑', hill: '坡地', race: '比赛', strength: '力量' }
 const BASIS = { culture: '文化', time: '时间', climate: '气候', physique: '体形', note: '说明' }
-const levelLabel = v => LEVEL[v] || v
 const originLabel = v => ORIGIN[v] || v
-const sessionLabel = v => SESSION[v] || v
 const basisLabel = k => BASIS[k] || k
-const evTagType = lv => ({ A: 'success', B: 'primary', C: 'warning', D: 'info' }[lv] || 'info')
 const kmRange = m => {
   const r = m.weekly_km_range || {}
   return (r.min || r.max) ? `周跑量 ${r.min}-${r.max}km` : '跑量不限'

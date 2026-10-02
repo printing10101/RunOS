@@ -1,0 +1,210 @@
+{
+ "meta": {
+  "file": "training_plans_extra.json",
+  "scope": "参考计划补充：半马缺口的 Higdon 半马中级、Higdon 全马中级、Pfitzinger 18/70 高跑量版",
+  "collected_at": "2026-09-29",
+  "collected_by": "公开文献与原书目录核对",
+  "disclaimer": "计划骨架以原作者公开发布口径为准，换算公制时四舍五入；证据等级沿用出处的转述层级。"
+ },
+ "plans": [
+  {
+   "code": "higdon-half-novice",
+   "name_zh": "Higdon 半马新手（12 周）",
+   "name_en": "Hal Higdon Half Marathon Novice 1",
+   "author": "Hal Higdon",
+   "target_race": "hm",
+   "level": "beginner",
+   "weeks": 12,
+   "weekly_km_range": {"min": 15, "max": 35},
+   "days_per_week": {"min": 4, "max": 4},
+   "phases": ["base", "build", "peak", "taper"],
+   "week_template": {
+    "tue": "easy",
+    "wed": "easy",
+    "thu": "easy_short",
+    "sat": "long",
+    "note": "4 个跑步日（周二/周三/周四轻松跑 + 周六长距离），周一/周五休息，周日可选 30-60 分钟步行或交叉训练；全程无质量课"
+   },
+   "long_run_progression": [
+    {"week": 1, "km": 6},
+    {"week": 4, "km": 9},
+    {"week": 7, "km": 13},
+    {"week": 10, "km": 16, "note": "最长 10 英里≈16km"},
+    {"week": 11, "km": 11, "note": "减量周"},
+    {"week": 12, "km": 21.1, "note": "比赛"}
+   ],
+   "key_workouts": [
+    "每周一次长距离（唯一硬要求），配速比目标半马配速慢 45-90 秒/公里",
+    "周中 3 次轻松跑：30-45 分钟，全程能聊天",
+    "周日休息或 30-60 分钟步行/交叉训练"
+   ],
+   "taper_plan": "最后 2 周减量：长距离 16→11km，赛前 2 天休息",
+   "fit_condition": {
+    "weekly_km_min": 8,
+    "weekly_km_max": 40,
+    "level_in": ["beginner"],
+    "race_in": ["hm"]
+   },
+   "fit_notes": "能连续跑 3 公里以上的首半马人群；周跑量 15km 起步即可",
+   "pros": "长距离只到 16km、课量温和，首半马完赛导向；无质量课意味着伤病与疲劳风险最低",
+   "cons": "没有任何强度课，想带成绩目标的跑者应换中级版；周跑量较低，底子积累慢",
+   "cautions": "长距离配速必须保守；跳过长距离周时下一周直接顺延，不要跳级拉长",
+   "evidence_level": "C",
+   "evidence_note": "Higdon 官方发布的公开计划；完赛率为使用者自报数据，无对照研究。",
+   "sources": [
+    {"title": "Hal Higdon 官方训练计划（Half Marathon Novice 1）", "url": "https://www.halhigdon.com/training/", "source_type": "official", "year": null, "level": "C", "note": "12 周、4 天制、长距离峰值 10 英里；以官方站点 Half Marathon Novice 系列为准"}
+   ]
+  },
+  {
+   "code": "higdon-half-intermediate",
+   "name_zh": "Higdon 半马中级（12 周）",
+   "name_en": "Hal Higdon Half Marathon Intermediate",
+   "author": "Hal Higdon",
+   "target_race": "hm",
+   "level": "intermediate",
+   "weeks": 12,
+   "weekly_km_range": {"min": 24, "max": 45},
+   "days_per_week": {"min": 5, "max": 5},
+   "phases": ["base", "build", "peak", "taper"],
+   "week_template": {
+    "tue": "easy",
+    "wed": "tempo_pace",
+    "thu": "easy",
+    "sat": "long",
+    "sun": "recovery_cross",
+    "note": "5 个跑步日：周二/周四轻松跑，周三节奏（pace）课，周六长距离，周日恢复跑或交叉训练；周一/周五休息"
+   },
+   "long_run_progression": [
+    {"week": 1, "km": 8},
+    {"week": 4, "km": 11},
+    {"week": 7, "km": 14},
+    {"week": 10, "km": 18, "note": "最长（超过比赛距离，建立完赛信心）"},
+    {"week": 11, "km": 11, "note": "减量周"},
+    {"week": 12, "km": 21.1, "note": "比赛"}
+   ],
+   "key_workouts": [
+    "周三 pace run：按目标半马配速跑 5-9km 中距离（唯一质量课口径）",
+    "周六长距离：比比赛距离略长的 18km 一次，建立距离信心",
+    "周日恢复跑/交叉训练 30-45 分钟，压心率"
+   ],
+   "taper_plan": "最后 2 周跑量砍约 1/3，长距离 18→11km，赛前 2-3 天只留短恢复跑",
+   "fit_condition": {
+    "weekly_km_min": 15,
+    "weekly_km_max": 45,
+    "level_in": ["intermediate"],
+    "race_in": ["hm"]
+   },
+   "fit_notes": "已有 5K/10K 经验、首次半马或想稳完赛的中阶跑者；周跑量 15km 起步",
+   "pros": "结构简单可执行；长距离超比赛距离的设计对首半马心理收益大；5 天制的课时压力可控",
+   "cons": "质量课只有周三一场 pace run，对成绩突破刺激不足；无力量/步频等辅助建议",
+   "cautions": "长距离宁可慢不可快（比目标半马配速慢 45-90 秒/公里）；连续跟不上周进度时重复上一周",
+   "evidence_level": "C",
+   "evidence_note": "Higdon 官方发布的公开计划，结构信息公开；完赛率为使用者自报数据，无对照研究。",
+   "sources": [
+    {"title": "Hal Higdon 官方训练计划（Half Marathon Intermediate）", "url": "https://www.halhigdon.com/training/", "source_type": "official", "year": null, "level": "C", "note": "官网计划页路径可能调整，以官方站点的 Half Marathon 系列为准；12 周、5 天制、pace run 周三、长距离周六"}
+   ]
+  },
+  {
+   "code": "higdon-intermediate-marathon",
+   "name_zh": "Higdon 全马中级 18 周（Intermediate 1）",
+   "name_en": "Hal Higdon Marathon Intermediate 1",
+   "author": "Hal Higdon",
+   "target_race": "marathon",
+   "level": "intermediate",
+   "weeks": 18,
+   "weekly_km_range": {"min": 35, "max": 65},
+   "days_per_week": {"min": 5, "max": 5},
+   "phases": ["base", "build", "peak", "taper"],
+   "week_template": {
+    "tue": "easy_medium",
+    "wed": "easy_short",
+    "thu": "pace_run",
+    "sat": "long",
+    "sun": "recovery_cross",
+    "note": "5 个跑步日：周二中距离、周三短恢复、周四 pace run（后 9 周逐步加马配占比）、周六长距离、周日交叉训练 60 分钟；周一/周五休息"
+   },
+   "long_run_progression": [
+    {"week": 1, "km": 13},
+    {"week": 5, "km": 18},
+    {"week": 9, "km": 24},
+    {"week": 13, "km": 32, "note": "最长 20 英里≈32km"},
+    {"week": 14, "km": 20, "note": "三级减量开始"},
+    {"week": 15, "km": 23},
+    {"week": 17, "km": 13},
+    {"week": 18, "km": 42.2, "note": "比赛"}
+   ],
+   "key_workouts": [
+    "周四 pace run：中距离里逐步掺入目标马配段（第 10 周起占比加大）",
+    "周六长距离：峰值 32km，配速比目标马配慢 45-90 秒/公里",
+    "周日交叉训练 60 分钟（自行车/游泳/椭圆机），不落地恢复"
+   ],
+   "taper_plan": "第 15-18 周三级减量（-3 英里递减口径），长距离 32→20→23→13km，赛前 3 天休息",
+   "fit_condition": {
+    "weekly_km_min": 25,
+    "weekly_km_max": 60,
+    "level_in": ["intermediate"],
+    "race_in": ["marathon"]
+   },
+   "fit_notes": "已有一次完赛经验或周跑量 25km+、想要成绩目标的第二场全马人群",
+   "pros": "比新手计划多了 pace run 的专项课；交叉训练日保护恢复；减量方案明确",
+   "cons": "无跑道间歇/阈值课，对破三/破四等成绩目标刺激有限；长距离 32km 对部分人是过大单次负荷",
+   "cautions": "pace run 的马配段以当前状态对应的目标为准，不是梦想目标；32km 长距离前后两天必须全休或交叉训练",
+   "evidence_level": "C",
+   "evidence_note": "Higdon 官方发布的公开计划；同为使用者自报数据，无对照研究。",
+   "sources": [
+    {"title": "Hal Higdon 官方训练计划（Marathon Intermediate 1）", "url": "https://www.halhigdon.com/training/", "source_type": "official", "year": null, "level": "C", "note": "18 周、5 天制、周四 pace run、长距离峰值 20 英里；以官方站点 Marathon 系列为准"}
+   ]
+  },
+  {
+   "code": "pfitzinger-18-70",
+   "name_zh": "Pfitzinger 18 周 / 峰值 70 英里（进阶版）",
+   "name_en": "Pfitzinger Advanced Marathoning 18/70",
+   "author": "Pete Pfitzinger & Scott Douglas",
+   "target_race": "marathon",
+   "level": "advanced",
+   "weeks": 18,
+   "weekly_km_range": {"min": 72, "max": 113},
+   "days_per_week": {"min": 6, "max": 7},
+   "phases": ["base", "build", "peak", "taper"],
+   "week_template": {
+    "tue": "vo2_interval",
+    "wed": "medium_long_recovery",
+    "thu": "medium_long",
+    "fri": "easy",
+    "sat": "tempo_mp",
+    "sun": "long",
+    "note": "6-7 跑：周二 VO2 间歇（周期早段），周三恢复性中长，周四中长距离，周六 MP/节奏，周日长距离；单日双跑允许拆分"
+   },
+   "long_run_progression": [
+    {"week": 1, "km": 24},
+    {"week": 6, "km": 29},
+    {"week": 12, "km": 34, "note": "峰值长距离"},
+    {"week": 13, "km": 32, "note": "含 MP 段的专项长距离"},
+    {"week": 14, "km": 24, "note": "减量开始"},
+    {"week": 16, "km": 21, "note": "含马配段收尾"},
+    {"week": 18, "km": 42.2, "note": "比赛"}
+   ],
+   "key_workouts": [
+    "周二 VO2 间歇（6-8×1000m I 区）：只出现在周期早段",
+    "周四中长距离 16-26km：本计划的招牌负荷单元",
+    "周六 MP 课：10-16km 马配段，专项期逐步加长",
+    "周日长距离：峰值 34km，其中 3 次带 MP 段"
+   ],
+   "taper_plan": "第 14-18 周减量（跑量 -30%~递减），保留 MP 触碰但砍掉 VO2 课；赛前 3 天近乎全休",
+   "fit_condition": {
+    "weekly_km_min": 55,
+    "level_in": ["advanced"],
+    "race_in": ["marathon"]
+   },
+   "fit_notes": "已有完整全马经历、周跑量 55km+（最好 70km）、目标明确破 PB 的进阶跑者",
+   "pros": "中长距离×2/周的专项负荷对后程耐力收益最直接；VO2 前置 + MP 后置的排序贴近比赛需求；减量方案精细",
+   "cons": "跑量与课时门槛最高（工作日需要 90 分钟课时）；伤病与过度训练风险随跑量放大；无轻松跑缓冲日少",
+   "cautions": "周跑量没到 55km 不要硬上；双跑日拆分时早课一定是轻松跑；MP 段连续两周跑崩即整体降目标配速",
+   "evidence_level": "C",
+   "evidence_note": "原书计划结构（Advanced Marathoning，18/70 表）；作者本人为奥运选手，计划有效性无对照研究，属教练方法论。",
+   "sources": [
+    {"title": "Advanced Marathoning 2nd/3rd Edition（Pfitzinger & Douglas, Human Kinetics）", "url": "", "source_type": "book", "year": 2009, "level": "C", "note": "书目出处：18 周 / 至 70 英里（~113km）计划表见原书第 4 章计划附录；公制换算四舍五入"}
+   ]
+  }
+ ]
+}

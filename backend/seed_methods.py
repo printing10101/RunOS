@@ -1,10 +1,10 @@
 """把 backend/data/ 下的知识库种子 JSON 导入（按 code upsert，可重复执行）。
 
 用法： cd backend && python seed_methods.py
-支持文件：
+支持文件（按文件名模式匹配，同模式可放多个分卷文件）：
   training_methods_*.json    → 训练方法/体系（含课表模板、出处、适配规则）
-  training_principles.json   → 训练原理（出处写入 knowledge_sources, ref_type=principle）
-  training_plans_library.json→ 参考训练计划（出处写入 knowledge_sources, ref_type=plan）
+  training_*principles*.json → 训练原理（出处写入 knowledge_sources, ref_type=principle）
+  training_*plans*.json      → 参考训练计划（出处写入 knowledge_sources, ref_type=plan）
 数据维护方式：新增/修改只需编辑 data/ 下 JSON，再重跑本脚本。导入幂等。
 """
 from __future__ import annotations
@@ -123,7 +123,7 @@ def run() -> None:
                             weight=float(r.get("weight", 10)), reason=r.get("reason", "")))
                         n_r += 1
                     n_m += 1
-            elif fp.name == "training_principles.json":
+            elif "principles" in fp.name:
                 for p in doc.get("principles", []):
                     row = db.scalar(select(models.TrainingPrinciple).where(
                         models.TrainingPrinciple.code == p["code"]))
@@ -137,7 +137,7 @@ def run() -> None:
                     db.flush()
                     n_src += _sync_sources(db, "principle", p["code"], p.get("sources"))
                     n_p += 1
-            elif fp.name == "training_plans_library.json":
+            elif "plans" in fp.name:
                 for pl in doc.get("plans", []):
                     row = db.scalar(select(models.PlanTemplate).where(
                         models.PlanTemplate.code == pl["code"]))

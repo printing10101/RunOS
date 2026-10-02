@@ -192,51 +192,98 @@ def test_seed_every_workout_has_cautions_or_note():
 
 # ---------------------------------------------------------------- 原理库与计划库种子（可追溯性承诺）
 
-PRINCIPLE_FILE = DATA_DIR / "training_principles.json"
-PLAN_FILE = DATA_DIR / "training_plans_library.json"
+# 与 seed_methods.py 的文件名模式保持同源：principles/plans 支持多分卷文件
+PRINCIPLE_FILES = sorted(DATA_DIR.glob("training_*principles*.json"))
+PLAN_FILES = sorted(DATA_DIR.glob("training_*plans*.json"))
 
 
 def test_principle_file_exists_with_content():
-    doc = json.loads(PRINCIPLE_FILE.read_text(encoding="utf-8"))
-    assert len(doc["principles"]) >= 8
+    assert PRINCIPLE_FILES, "找不到 training_*principles*.json 种子文件"
+    total = sum(len(json.loads(f.read_text(encoding="utf-8"))["principles"])
+                for f in PRINCIPLE_FILES)
+    assert total >= 8
 
 
 def test_principles_structure_complete():
     """每条原理必须有机制、可执行规则、出处——否则 AI 的『有迹可循』承诺失效。"""
-    doc = json.loads(PRINCIPLE_FILE.read_text(encoding="utf-8"))
     codes = set()
-    for p in doc["principles"]:
-        assert p["code"] and p["code"] not in codes
-        codes.add(p["code"])
-        assert p["mechanism"], f"{p['code']} 缺 mechanism"
-        assert p["practical_rules"], f"{p['code']} 缺 practical_rules"
-        assert p["platform_usage"], f"{p['code']} 缺 platform_usage（应说明引擎已落地位置）"
-        assert p["evidence_level"] in ("A", "B", "C", "D")
-        assert len(p.get("sources") or []) >= 1, f"{p['code']} 没有出处"
+    for fp in PRINCIPLE_FILES:
+        doc = json.loads(fp.read_text(encoding="utf-8"))
+        for p in doc["principles"]:
+            assert p["code"] and p["code"] not in codes, f"重复/空 code: {p.get('code')}"
+            codes.add(p["code"])
+            assert p["mechanism"], f"{p['code']} 缺 mechanism"
+            assert p["practical_rules"], f"{p['code']} 缺 practical_rules"
+            assert p["platform_usage"], f"{p['code']} 缺 platform_usage（应说明引擎已落地位置）"
+            assert p["evidence_level"] in ("A", "B", "C", "D")
+            assert len(p.get("sources") or []) >= 1, f"{p['code']} 没有出处"
 
 
 def test_plans_structure_complete():
-    doc = json.loads(PLAN_FILE.read_text(encoding="utf-8"))
     codes = set()
-    for pl in doc["plans"]:
-        assert pl["code"] and pl["code"] not in codes
-        codes.add(pl["code"])
-        assert pl["weeks"] >= 4
-        assert pl.get("week_template"), f"{pl['code']} 缺周模板"
-        assert pl.get("key_workouts"), f"{pl['code']} 缺关键课"
-        assert pl.get("long_run_progression"), f"{pl['code']} 缺长距离递进"
-        assert pl.get("taper_plan"), f"{pl['code']} 缺减量方案"
-        assert pl["evidence_level"] in ("A", "B", "C", "D")
-        assert len(pl.get("sources") or []) >= 1, f"{pl['code']} 没有出处"
-        assert pl.get("cautions"), f"{pl['code']} 缺风险提示"
-        # 长距离递进必须覆盖从起点到比赛/峰值的演进
-        lr = pl["long_run_progression"]
-        assert lr[0]["km"] < lr[-1]["km"] or pl["target_race"] in ("5k",), f"{pl['code']} 递进异常"
+    for fp in PLAN_FILES:
+        doc = json.loads(fp.read_text(encoding="utf-8"))
+        for pl in doc["plans"]:
+            assert pl["code"] and pl["code"] not in codes, f"重复/空 code: {pl.get('code')}"
+            codes.add(pl["code"])
+            assert pl["weeks"] >= 4
+            assert pl.get("week_template"), f"{pl['code']} 缺周模板"
+            assert pl.get("key_workouts"), f"{pl['code']} 缺关键课"
+            assert pl.get("long_run_progression"), f"{pl['code']} 缺长距离递进"
+            assert pl.get("taper_plan"), f"{pl['code']} 缺减量方案"
+            assert pl["evidence_level"] in ("A", "B", "C", "D")
+            assert len(pl.get("sources") or []) >= 1, f"{pl['code']} 没有出处"
+            assert pl.get("cautions"), f"{pl['code']} 缺风险提示"
+            # 长距离递进必须覆盖从起点到比赛/峰值的演进
+            lr = pl["long_run_progression"]
+            assert lr[0]["km"] < lr[-1]["km"] or pl["target_race"] in ("5k",), f"{pl['code']} 递进异常"
 
 
 def test_plan_codes_unique_and_cautions_present():
-    doc = json.loads(PLAN_FILE.read_text(encoding="utf-8"))
-    assert len(doc["plans"]) >= 8
-    # 每个计划必须给适配条件（否则推荐层无法解释命中）
-    for pl in doc["plans"]:
-        assert pl.get("fit_condition"), f"{pl['code']} 缺 fit_condition"
+    total = 0
+    for fp in PLAN_FILES:
+        doc = json.loads(fp.read_text(encoding="utf-8"))
+        total += len(doc["plans"])
+        # 每个计划必须给适配条件（否则推荐层无法解释命中）
+        for pl in doc["plans"]:
+            assert pl.get("fit_condition"), f"{pl['code']} 缺 fit_condition"
+    assert total >= 8
+
+
+def test_tool_method_detail_returns_lightweight_workouts():
+    """回归（2026-09-29）：method_full 返回的 workouts 已是 dict，旧代码对 dict
+    再调 workout_dict(w) 访问 .id，导致 get_method_workout_detail 对所有方法都炸。
+    修复后必须返回轻量摘要（无 structure），配速解析交给 resolve_method_workout。"""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    from app.db import Base
+    from app.models import TrainingMethod, WorkoutTemplate
+    from app.services.ai_tools import execute_tool
+    from factories import make_athlete
+
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False},
+                           poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    db = sessionmaker(bind=engine)()
+    try:
+        m = TrainingMethod(code="t-detail", name_zh="测试法", name_en="t", origin="global",
+                           category="system", level="beginner", evidence_level="C")
+        db.add(m)
+        db.flush()
+        db.add(WorkoutTemplate(method_id=m.id, code="t-detail-w1", name_zh="测试课",
+                               session_type="easy",
+                               structure=[{"step_type": "active", "name": "跑",
+                                           "duration_type": "time", "duration_value": 10}]))
+        db.flush()
+        athlete = make_athlete(name="测试跑者")
+        db.add(athlete)
+        db.flush()
+        r = execute_tool(db, athlete, "get_method_workout_detail", {"code": "t-detail"})
+        assert r.get("code") == "t-detail"
+        assert r["workouts"][0]["code"] == "t-detail-w1"
+        assert "structure" not in r["workouts"][0], "LLM 侧详情不应携带整段 structure"
+    finally:
+        db.close()
+        engine.dispose()

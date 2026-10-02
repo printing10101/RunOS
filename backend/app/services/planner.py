@@ -40,6 +40,15 @@ PHASE_INFO = {
 }
 
 
+def week_start(d: date) -> date:
+    """项目统一口径：一周从周一开始（plan_weeks.start_date 同语义）。
+
+    周跑量统计、执行率归属、挪课推日期、减量对照全都依赖这条不变量，
+    全系统的「这一周的周一」都从这里取，勿再内联 `d - timedelta(days=d.weekday())`。
+    """
+    return d - timedelta(days=d.weekday())
+
+
 def _pace_targets(vdot_value: float, kind: str) -> dict:
     zones = {z["key"]: z for z in vdot.daniels_paces(vdot_value)}
     v = zones[kind]["velocity_from"]
@@ -319,7 +328,7 @@ def generate_plan(
     today = date.today()
     # 未指定开始日期时，从本周周一开始（周课表按周一~周日对齐）
     start = goal.get("start_date") or today
-    start_date = start - timedelta(days=start.weekday())
+    start_date = week_start(start)
     race_date = goal.get("target_date") or (start_date + timedelta(weeks=16))
     total_weeks = max(4, min(30, (race_date - start_date).days // 7))
 
@@ -362,7 +371,7 @@ def generate_plan(
     weeks_out = []
     for w in range(total_weeks):
         phase = phase_seq[w]
-        week_start = start_date + timedelta(weeks=w)
+        week_monday = start_date + timedelta(weeks=w)
         # 目标 VDOT：有完赛目标用其反推，否则回退到当前能力 +3（显式分支，避免 and/or 短路歧义）
         target_vdot = (vdot.required_vdot(race_type, target_sec) if target_sec else current_vdot + 3)
         week_vdot = current_vdot + (min(current_vdot + 6, target_vdot) - current_vdot) * (w / max(1, total_weeks - 1))
@@ -389,7 +398,7 @@ def generate_plan(
 
         for slot in available_slots:
             wd = slot["weekday"]
-            wdate = week_start + timedelta(days=wd)
+            wdate = week_monday + timedelta(days=wd)
             start_time = slot["start_time"]
             if slot.get("kind", "available") != "available":
                 continue
@@ -423,9 +432,9 @@ def generate_plan(
         note = phase_note + ("（减量恢复周）" if cutback else "")
         focus = {"base": "有氧底子", "build": "阈值/摄氧", "peak": "比赛专项", "taper": "恢复蓄力"}[phase]
         weeks_out.append({
-            "week_index": w + 1, "start_date": week_start.isoformat(),
+            "week_index": w + 1, "start_date": week_monday.isoformat(),
             "phase": phase, "phase_note": note, "focus": focus,
-            "target_km": week_km if not cutback else week_km,
+            "target_km": week_km,
             "workouts": workouts,
         })
 

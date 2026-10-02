@@ -49,6 +49,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { api } from '../../api'
+import { evTagType } from './shared'
 
 const items = ref([])
 const fCat = ref('')
@@ -61,7 +62,6 @@ const CATS = [
   { value: 'technique', label: '技术' }, { value: 'psychology', label: '心理' },
 ]
 const cats = CATS
-const evTagType = lv => ({ A: 'success', B: 'primary', C: 'warning', D: 'info' }[lv] || 'info')
 
 const filtered = computed(() => items.value.filter(p => !fCat.value || p.category === fCat.value))
 

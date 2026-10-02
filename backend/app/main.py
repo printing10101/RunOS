@@ -22,6 +22,7 @@ from .routers import (
     connections,
     dashboard,
     diet,
+    explore,
     gear,
     health,
     methods,
@@ -86,6 +87,7 @@ app.include_router(dashboard.router)
 app.include_router(training_status.router)
 app.include_router(health.router)
 app.include_router(stats.router)
+app.include_router(explore.router)
 app.include_router(gear.router)
 app.include_router(races.router)
 app.include_router(checkin.router)

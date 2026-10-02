@@ -46,3 +46,11 @@ def session_label(session_type: str | None) -> str:
     if not session_type:
         return "训练"
     return _LABELS.get(session_type, session_type)
+
+
+# 公开标签表：需要「完整值→中文映射」的调用方（如数据探索的课型分组）
+# 从这里取，不再绕取私有 _LABELS，与 session_label 保持单源同口径。
+SESSION_TYPE_LABELS = dict(_LABELS)
+
+# 星期中文名（周一~周日）：晨报/点评/工具文案共用一份，勿再各文件自抄
+WEEKDAY_CN = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]

@@ -28,6 +28,7 @@ from ..data import active_plan, activities_dicts, body_metrics_dicts
 from . import ai_tools, load_project, vocab
 from .ai_tools import active_slots
 from .load_status import build_training_status
+from .planner import week_start
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 # ---------------------------------------------------------------- 信号收集
 def _week_km_actual(acts: list[dict], today: date) -> float:
-    monday = today - timedelta(days=today.weekday())
+    monday = week_start(today)
     return round(sum(a.get("distance_m") or 0 for a in acts
                      if a.get("sport") == "run" and a["start_time"].date() >= monday) / 1000, 1)
 
@@ -87,6 +88,7 @@ def collect_signals(db: Session, athlete: models.Athlete) -> dict:
         "today": today,
         "plan": plan,
         "acts": acts,
+        "athlete_hr": {"max_hr": athlete.max_hr, "resting_hr": athlete.resting_hr, "sex": athlete.sex},
         "acwr": st.get("acwr"),
         "form": st.get("form"),
         "fitness": st.get("fitness"),
@@ -146,9 +148,11 @@ def detect_findings(sig: dict) -> list[dict]:
                     "duration_min": wo.duration_min, "distance_km": wo.distance_km,
                     "title": wo.title} for wo in sig["upcoming"]]
         try:
+            # 档案心率必须是真实值：硬编码 200/60 会让这里的 TRIMP 估算与
+            # 前瞻负荷页/减量对照（都传真实档案）系统性对不上
             projection = load_project.project_load(
                 daily_actual=[], planned=planned,
-                athlete={"max_hr": 200, "resting_hr": 60},
+                athlete=sig["athlete_hr"],
                 fitness=sig["fitness"] or 0.0, fatigue=sig["fatigue"] or 0.0,
                 race_date=sig["plan"].race_date)
         except Exception as e:   # 投影失败不拖垮整体报告

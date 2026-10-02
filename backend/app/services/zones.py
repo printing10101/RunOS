@@ -32,6 +32,28 @@ def hr_zones(max_hr: int | None, resting_hr: int | None) -> list[dict]:
     return out
 
 
+def estimate_zone_seconds(duration_sec: float | None, avg_hr: float | None,
+                          max_hr: int | None, resting_hr: int | None) -> dict[str, float] | None:
+    """只有均心率（无设备逐段区间）时的五区间时长估算。
+
+    均心率经 Karvonen 储备心率落位到唯一一档，整段时长记入该档：均心率本身
+    不携带分布信息，不做人工摊开——调用方（pro_insights 强度分布卡）会把
+    这类样本如实标注为「均心率估算」。缺任一心率基准、时长/均心率无效、
+    或均心率低于静息（坏样本）时返回 None，不猜。
+    """
+    if not duration_sec or duration_sec <= 0:
+        return None
+    if not avg_hr or not max_hr or not resting_hr or max_hr <= resting_hr:
+        return None
+    pct = (avg_hr - resting_hr) / max(1, max_hr - resting_hr)
+    if pct <= 0:
+        return None
+    zones_total: dict[str, float] = {key: 0.0 for key, *_rest in ZONE_DEFS}
+    anchor = next((key for key, _label, lo, hi, _purpose in ZONE_DEFS if lo <= pct < hi), "Z5")
+    zones_total[anchor] = float(duration_sec)
+    return zones_total
+
+
 def intensity_distribution(activities: list[dict], max_hr: int | None = None,
                            resting_hr: int | None = None) -> dict:
     """按 HR 占储备心率比例统计三档强度时长占比，对照 80/20 原则。

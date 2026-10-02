@@ -15,6 +15,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from .load import hr_reserve
+from .planner import week_start
 
 # 负荷重点参考区间（占比，工程近似佳明负荷重点思想）
 FOCUS_GUIDE = {"low_aerobic": (55, 80), "high_aerobic": (15, 35), "anaerobic": (0, 12)}
@@ -305,29 +306,27 @@ def _readiness(body_metrics: list[dict], latest: dict | None,
 
 def _endurance_score(runs: list[dict], now: datetime) -> dict:
     """耐力得分（0-100）：周跑量 50% + 长距离占比 30% + 规律性 20%（工程估计）。"""
-    recent = [a for a in runs if a["start_time"] >= now - timedelta(weeks=12)]
+    recent = [(a, week_start(a["start_time"].date()))
+              for a in runs if a["start_time"] >= now - timedelta(weeks=12)]
     if not recent:
         return {"score": None, "label": "数据不足"}
-    weeks = max(1, len({a["start_time"].date() - timedelta(days=a["start_time"].weekday()) for a in recent}))
-    weekly_km = sum((a.get("distance_m") or 0) for a in recent) / 1000 / weeks
+    weeks = max(1, len({wk for _, wk in recent}))
+    weekly_km = sum((a.get("distance_m") or 0) for a, _ in recent) / 1000 / weeks
     vol_score = min(1.0, weekly_km / 70)                      # 70km/周 = 满分锚点
 
     by_week: dict[date, float] = {}
-    for a in recent:
-        wk = a["start_time"].date() - timedelta(days=a["start_time"].weekday())
+    for a, wk in recent:
         by_week[wk] = by_week.get(wk, 0) + (a.get("distance_m") or 0) / 1000
     longs = 0
     for wk, km in by_week.items():
-        wk_runs = [a for a in recent
-                   if a["start_time"].date() - timedelta(days=a["start_time"].weekday()) == wk]
+        wk_runs = [a for a, w in recent if w == wk]
         longest = max((a.get("distance_m") or 0) / 1000 for a in wk_runs)
         if km > 0 and longest >= max(8.0, km * 0.30):
             longs += 1
     long_score = min(1.0, longs / max(1, len(by_week)) / 0.6)
 
     regular = sum(1 for wk in by_week
-                  if sum(1 for a in recent
-                         if a["start_time"].date() - timedelta(days=a["start_time"].weekday()) == wk) >= 3)
+                  if sum(1 for _, w in recent if w == wk) >= 3)
     reg_score = min(1.0, regular / max(1, len(by_week)))
 
     score = round((vol_score * 0.5 + long_score * 0.3 + reg_score * 0.2) * 100)
@@ -338,13 +337,14 @@ def _endurance_score(runs: list[dict], now: datetime) -> dict:
 
 def _hill_score(runs: list[dict], now: datetime) -> dict:
     """爬坡得分（0-100）：周均爬升 60% + 单位距离爬升 40%（工程估计，锚点 500m/周）。"""
-    recent = [a for a in runs if a["start_time"] >= now - timedelta(weeks=8)]
+    recent = [(a, week_start(a["start_time"].date()))
+              for a in runs if a["start_time"] >= now - timedelta(weeks=8)]
     if not recent:
         return {"score": None, "label": "数据不足"}
-    weeks = max(1, len({a["start_time"].date() - timedelta(days=a["start_time"].weekday()) for a in recent}))
-    weekly_elev = sum(a.get("elevation_m") or 0 for a in recent) / weeks
-    total_km = sum((a.get("distance_m") or 0) for a in recent) / 1000 or 1
-    elev_per_km = sum(a.get("elevation_m") or 0 for a in recent) / total_km
+    weeks = max(1, len({wk for _, wk in recent}))
+    weekly_elev = sum(a.get("elevation_m") or 0 for a, _ in recent) / weeks
+    total_km = sum((a.get("distance_m") or 0) for a, _ in recent) / 1000 or 1
+    elev_per_km = sum(a.get("elevation_m") or 0 for a, _ in recent) / total_km
 
     score = round(min(1.0, weekly_elev / 500) * 60 + min(1.0, elev_per_km / 20) * 40)
     label = ("山地型" if score >= 75 else "坡感良好" if score >= 50 else

@@ -28,14 +28,14 @@
             <span>{{ pl.weeks }} 周</span><i>/</i>
             <span>峰值 {{ pl.weekly_km_range?.min }}-{{ pl.weekly_km_range?.max }} km/周</span><i>/</i>
             <span>每周 {{ pl.days_per_week?.min }}-{{ pl.days_per_week?.max }} 练</span><i>/</i>
-            <span>{{ raceLabel(pl.target_race) }} · {{ levelLabel(pl.level) }}</span>
+            <span>{{ raceTypeName(pl.target_race) }} · {{ levelLabel(pl.level) }}</span>
           </div>
           <div class="pl-fit" v-if="pl.fit_notes">🎯 {{ pl.fit_notes }}</div>
 
           <el-collapse class="pl-more">
             <el-collapse-item :title="'计划结构与出处'">
               <div class="pb-title">周模板</div>
-              <div class="pb-body">{{ weekText(pl) || '按阶段弹性安排' }}</div>
+              <div class="pb-body">{{ weekTemplateText(pl) || '按阶段弹性安排' }}</div>
               <div class="pb-title" style="margin-top:10px">长距离递进</div>
               <div class="pb-body" v-if="longRunText(pl)">{{ longRunText(pl) }}</div>
               <div class="pb-title" style="margin-top:10px">关键课</div>
@@ -67,35 +67,12 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { api } from '../../api'
+import { raceTypeName } from '../../utils/common'
+import { evTagType, levelLabel, weekTemplateText, longRunText } from './shared'
 
 const items = ref([])
 const fRace = ref('')
 const fLevel = ref(null)
-
-const RACE = { '5k': '5K', '10k': '10K', hm: '半马', marathon: '全马', any: '通用' }
-const LEVEL = { beginner: '入门', intermediate: '进阶', advanced: '高级', elite: '精英' }
-const WK = { mon: '一', tue: '二', wed: '三', thu: '四', fri: '五', sat: '六', sun: '日' }
-const SESSION = {
-  easy: '轻松跑', easy_short: '短轻松跑', recovery: '恢复跑', recovery_cross: '恢复/交叉',
-  tempo: '节奏跑', interval: '间歇', long: '长距离', long_pace: '带配速长距离', long_with_mp: '马配长距离',
-  medium_long: '中长距离', medium_long_or_LT: '中长/阈值', LT_or_VO2max: '阈值/VO2max',
-  general_aerobic: '一般有氧', speed_sos: '速度SOS', tempo_or_mp_sos: '节奏/马配SOS',
-  track_intervals: '跑道间歇', threshold_am: '阈值(早)', threshold_pm: '阈值(晚)',
-  quality_1: '质量课Q1', quality_2: '质量课Q2', strength: '力量', race: '比赛', rest: '休息',
-}
-const raceLabel = v => RACE[v] || v
-const levelLabel = v => LEVEL[v] || v
-const evTagType = lv => ({ A: 'success', B: 'primary', C: 'warning', D: 'info' }[lv] || 'info')
-
-function weekText(pl) {
-  return Object.entries(pl.week_template || {})
-    .filter(([k, v]) => WK[k] && SESSION[v])
-    .map(([k, v]) => `周${WK[k]}·${SESSION[v]}`).join(' · ')
-}
-function longRunText(pl) {
-  const lr = pl.long_run_progression || []
-  return lr.map(x => `W${x.week} ${x.km}km${x.note ? ` ${x.note}` : ''}`).join(' → ')
-}
 
 const filtered = computed(() => items.value.filter(pl =>
   (!fRace.value || pl.target_race === fRace.value || pl.target_race === 'any')

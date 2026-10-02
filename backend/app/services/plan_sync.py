@@ -22,6 +22,7 @@ from .. import models
 from ..data import archive_plan
 from ..integrations.base import IntegrationError
 from ..logging_config import get_logger
+from .planner import week_start
 
 logger = get_logger(__name__)
 
@@ -109,7 +110,7 @@ def sync_coros_schedule(db: Session, adapter) -> dict:
         archived_local = True
 
     dates = [date.fromisoformat(r["date"]) for r in rows if r.get("date")]
-    mondays = sorted({d - timedelta(days=d.weekday()) for d in dates})
+    mondays = sorted({week_start(d) for d in dates})
     index_of = {m: i + 1 for i, m in enumerate(mondays)}
 
     existing_planned = db.scalars(
@@ -126,8 +127,7 @@ def sync_coros_schedule(db: Session, adapter) -> dict:
         if not row.get("date"):
             continue
         d = date.fromisoformat(row["date"])
-        monday = d - timedelta(days=d.weekday())
-        week = _ensure_week(db, plan, monday, index_of)
+        week = _ensure_week(db, plan, week_start(d), index_of)
         ident = _identity(row)
         seen.add(ident)
         wo = by_identity.get(ident)
