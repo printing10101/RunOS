@@ -58,6 +58,19 @@
       <el-button size="small" round text class="ss-more" @click="$router.push('/status')">查看训练状态 →</el-button>
     </div>
 
+    <!-- 教练晨报：每天首次打开由后台生成（services/morning_brief.py），教练主动说第一句话 -->
+    <el-card v-if="morningBrief || briefGenerating" shadow="never" class="brief-card">
+      <div class="brief-body">
+        <span class="brief-icon">🌤</span>
+        <template v-if="morningBrief">
+          <span class="brief-text">{{ morningBrief.content }}</span>
+          <el-button size="small" round text type="primary" style="flex-shrink:0"
+                     @click="$router.push('/coach')">找教练聊聊 →</el-button>
+        </template>
+        <span v-else class="brief-text brief-loading">教练正在准备今天的晨报…</span>
+      </div>
+    </el-card>
+
     <el-row :gutter="14">
       <!-- 今日训练 HERO -->
       <el-col :span="16">
@@ -158,8 +171,8 @@
           </template>
           <div class="pace-strip">
             <div v-for="z in d.paces" :key="z.key" class="pace-tile" :class="'pt-' + z.key">
-              <div class="pt-key">{{ z.label.split(' ')[0] }}</div>
-              <div class="pt-name">{{ z.label.split(' ')[1] }}</div>
+              <div class="pt-key">{{ zoneParts(z.label)[1] }}</div>
+              <div class="pt-name">{{ zoneParts(z.label)[0] }}</div>
               <div class="pt-pace num-display">{{ z.pace_from }}</div>
               <div class="pt-to">~ {{ z.pace_to }}</div>
             </div>
@@ -238,9 +251,10 @@ import RingGauge from '../components/RingGauge.vue'
 import RollNum from '../components/RollNum.vue'
 import CheckinCard from '../components/CheckinCard.vue'
 import WeeklyRecap from '../components/WeeklyRecap.vue'
-import { platName, phaseName, stepColor, kindColor, downloadFile, todayStr, daysBetween } from '../utils/common'
+import { platName, phaseName, stepColor, kindColor, todayStr, daysBetween } from '../utils/common'
 import { axisStyle, tooltipStyle, splitLineStyle } from '../utils/echarts-theme'
 import { createChartManager } from '../composables/charts'
+import { useWorkoutPush } from '../composables/useWorkoutPush'
 
 const d = ref({})
 const kmChart = ref(null)
@@ -254,7 +268,9 @@ const recentDecisions = ref([])
 const checkinCardRef = ref(null)
 const weeklyRecapRef = ref(null)
 const loading = ref(true)
-const pushingId = ref(null)
+// 课表下发/FIT 导出与计划页共用一个 composable
+const { pushingId, pushWorkout: pushWo, downloadFit } = useWorkoutPush(
+  async () => { d.value = await api.get('/dashboard') })
 // 数据新鲜度：已连接平台但 48h 未同步 / 从未同步时提醒
 const syncStale = ref('')
 
@@ -291,7 +307,15 @@ const raceCountdown = computed(() => {
 const typeStyle = computed(() =>
   SESSION_STYLE[d.value.next_workout?.session_type] || { label: '训练', color: '#5f9fc9' })
 
-const stepsTotal = computed(() => d.value.next_workout?.structured?.length || 0)
+// structured 被后端截到前 4 条预览，步骤总数用后端另带的 steps_total
+const stepsTotal = computed(() => d.value.next_workout?.steps_total
+  ?? d.value.next_workout?.structured?.length ?? 0)
+
+// Daniels 标签形如「轻松跑(E)」：拆出中文名与区间缩写，配速带卡片分行展示
+function zoneParts(label) {
+  const m = String(label || '').match(/^(.*)\(([A-Z])\)$/)
+  return m ? [m[1], m[2]] : [label, '']
+}
 // 心率提示按课型分组：质量课全家族（含二代词汇）都是 Z4-Z5
 const HR_HINT = {
   easy: 'Z2', recovery: 'Z2', long: 'Z2-Z3',
@@ -317,28 +341,6 @@ const readinessColor = computed(() => {
   return s >= 80 ? '#5fc987' : s >= 60 ? '#d9a24e' : '#e05f5f'
 })
 
-async function pushWo(wo) {
-  pushingId.value = wo.id
-  try {
-    // 只发支持下发写入的平台（高驰 MCP 未开放训练写入，带上必然失败一项）
-    const conn = await api.get('/connections')
-    const opts = conn.connections
-      .filter(c => c.status === 'connected' && ['garmin', 'strava'].includes(c.platform))
-      .map(c => c.platform)
-    if (!opts.length) { ElMessage.warning('请先在「平台连接」页绑定佳明 / Strava'); return }
-    const r = await api.post(`/plan/workouts/${wo.id}/push`, { platforms: opts })
-    if (!r.pushed.length) {
-      ElMessage.error(r.results?.filter(x => !x.ok).map(x => `${platName(x.platform)}：${x.error}`).join('；') || '下发失败')
-    } else {
-      ElMessage.success(`已下发：${r.pushed.map(platName).join('、')}`)
-    }
-    d.value = await api.get('/dashboard')
-  } catch (e) { ElMessage.error(e.message || '下发失败') } finally { pushingId.value = null }
-}
-async function downloadFit(wo) {
-  await downloadFile(`/api/plan/workouts/${wo.id}/fit`, `workout_${wo.date}.fit`)
-}
-
 const charts = createChartManager()
 function renderKmChart() {
   if (!kmChart.value) return
@@ -363,13 +365,24 @@ function renderKmChart() {
 
 // 自动同步带来的新数据自动上屏：每 2 分钟静默刷新（仅页面可见时），体感「实时更新」
 let refreshTimer = null
+// 晨报 8s 衲拉定时器也要在卸载时清掉，否则离开页面后还会发一次请求
+let briefRetryTimer = null
 
 const loadError = ref('')
+
+// 教练晨报：当天没有时后台在生成，延迟几秒补拉一次上屏（每页只补一次，2 分钟兜底轮询也会带出）
+const morningBrief = computed(() => d.value.morning_brief?.brief || null)
+const briefGenerating = computed(() => !!d.value.morning_brief?.generating)
+let briefRetried = false
 
 async function loadDashboard() {
   try {
     d.value = await api.get('/dashboard')
     loadError.value = ''
+    if (d.value.morning_brief?.generating && !briefRetried) {
+      briefRetried = true
+      briefRetryTimer = setTimeout(loadDashboard, 8000)
+    }
   } catch (e) {
     // 首屏失败不再白屏：给出错误态和重试入口
     loadError.value = e.message || '无法连接后端服务，请确认服务已启动'
@@ -465,12 +478,18 @@ function retryDashboard() {
 onMounted(initDashboard)
 onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer)
+  if (briefRetryTimer) clearTimeout(briefRetryTimer)
   charts.disposeAll()
 })
 </script>
 
 <style scoped>
 .today-head { display: flex; align-items: flex-end; justify-content: space-between; }
+.brief-card { margin-top: 14px; }
+.brief-body { display: flex; align-items: center; gap: 10px; }
+.brief-icon { font-size: 20px; }
+.brief-text { flex: 1; font-size: 13.5px; line-height: 1.75; color: var(--text); }
+.brief-loading { color: var(--text-3); }
 .proposal-row { display: flex; align-items: flex-start; gap: 14px; padding: 10px 0; }
 .proposal-row + .proposal-row { border-top: 1px dashed rgba(255, 255, 255, 0.08); }
 .proposal-main { flex: 1; min-width: 0; }

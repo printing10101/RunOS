@@ -159,7 +159,7 @@ async function addNote() {
     newNote.value = ''
     loadNotes()
   } catch (e) {
-    ElMessage.error(e.response?.data?.detail || '记录失败')
+    ElMessage.error(e.message || '记录失败')
   } finally { addingNote.value = false }
 }
 
@@ -168,7 +168,7 @@ async function removeNote(n) {
     await api.del(`/ai/notes/${n.id}`)
     notes.value = notes.value.filter(x => x.id !== n.id)
   } catch (e) {
-    ElMessage.error(e.response?.data?.detail || '删除失败')
+    ElMessage.error(e.message || '删除失败')
   }
 }
 
@@ -304,7 +304,7 @@ async function applyProposal(p) {
     p.applied = true
     ElMessage.success('课表已更新')
   } catch (e) {
-    ElMessage.error(e.response?.data?.detail || '应用失败：校验未通过（课表可能已变化）')
+    ElMessage.error(e.message || '应用失败：校验未通过（课表可能已变化）')
   } finally { p.applying = false }
 }
 </script>

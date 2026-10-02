@@ -68,11 +68,14 @@ def dashboard(db: Session = Depends(get_db)):
                 "duration_min": wo.duration_min, "pushed_platforms": wo.pushed_platforms or [],
                 "start_time": wo.start_time,
                 "structured": wo.structured[:4] if wo.structured else [],
+                "steps_total": len(wo.structured) if wo.structured else 0,
+                # 所属计划的来源（coros=高驰镜像）：前端据此隐藏「下发手表」（官方课表不可写回）
+                "plan_source": (wo.week.plan.source if wo.week and wo.week.plan else "") or "",
                 "diet_tip": wo.diet_tip,
             }
 
     marathon = pred.predictions.get("marathon")
-    return {
+    payload = {
         "athlete": {"name": athlete.name, "age": date.today().year - athlete.birth_year,
                     "sex": athlete.sex, "weight_kg": athlete.weight_kg},
         "runner_type": runner_type_payload(db, athlete, pred=pred, acts=acts),
@@ -102,6 +105,10 @@ def dashboard(db: Session = Depends(get_db)):
         "body_trend": body_metrics_dicts(db, athlete.id, days=30),
         "status_summary": _status_summary(db, athlete, acts),
     }
+    # 教练晨报：当天没有就后台生成（不阻塞请求），前端拿到 generating 后稍后刷新
+    from ..services.morning_brief import dashboard_brief_payload
+    payload["morning_brief"] = dashboard_brief_payload(db, athlete)
+    return payload
 
 
 def _status_summary(db: Session, athlete: models.Athlete, acts: list[dict]) -> dict | None:

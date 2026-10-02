@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import random
 
+from .. import models
 from ..integrations.base import maybe_float
 
 # Minetti 能耗系数（J/kg/m）：坡度 i 下的跑步能耗，cost(0)=3.6
@@ -57,8 +58,12 @@ def decode_polyline(encoded: str) -> list[list[float]]:
 
 # ---------------------------------------------------------------- 主入口
 
-def build_activity_detail(act, athlete=None) -> dict:
-    """把 Activity ORM 对象装配为活动详情页 payload。"""
+def build_activity_detail(act, athlete=None, db=None) -> dict:
+    """把 Activity ORM 对象装配为活动详情页 payload。
+
+    db 传入时附带教练点评（活动级 + 关联课表课摘要）：详情页每条记录
+    都要能展示 AI 分析，关联课的信息用于卡片副标题与服务端点评路由。
+    """
     rng = random.Random(act.id * 7919 + int(act.start_time.timestamp()) % 100000)
     sport = act.sport or "run"
     dist_km = (act.distance_m or 0) / 1000
@@ -75,6 +80,19 @@ def build_activity_detail(act, athlete=None) -> dict:
     dynamics = _build_dynamics(act, detail, notes) if sport == "run" else None
     extras = _build_extras(act, detail, sport, notes)
     decoupling = single_decoupling(act, raw) if sport == "run" else None
+
+    plan_workout = None
+    if db is not None:
+        from sqlalchemy import select
+        wo = db.scalars(select(models.PlanWorkout).where(
+            models.PlanWorkout.completed_activity_id == act.id)).first()
+        if wo:
+            plan_workout = {
+                "workout_id": wo.id, "title": wo.title, "date": wo.date.isoformat(),
+                "status": wo.status,
+                "coach_comment": wo.coach_comment,
+                "coach_comment_at": wo.coach_comment_at.isoformat() if wo.coach_comment_at else None,
+            }
 
     pace_sec_per_km = round(avg_pace) if avg_pace else None
     return {
@@ -93,6 +111,9 @@ def build_activity_detail(act, athlete=None) -> dict:
         "hr_zone_times": zone_times, "track": track,
         "decoupling": decoupling,
         "notes": notes,
+        "coach_comment": act.coach_comment,
+        "coach_comment_at": act.coach_comment_at.isoformat() if act.coach_comment_at else None,
+        "plan_workout": plan_workout,
     }
 
 

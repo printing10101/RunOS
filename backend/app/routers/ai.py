@@ -10,13 +10,14 @@
                                    带 conversation_id 时问答自动持久化）
 - POST /api/ai/proposals/apply     应用 AI 提案（用户在前端点确认后调用；服务端重新校验）
 - POST /api/ai/workout-comment     训练后 AI 点评（完成打卡后生成/重新生成，模型不可用时规则兜底）
+- POST /api/ai/activity-comment    活动级 AI 点评（任意活动记录；关联已完成课自动路由到课表点评）
 - POST /api/ai/plan/from-text      自由文本目标 → 引擎可行性预检（不落库）
 - POST /api/ai/plan/confirm        确认后按参数建目标并生成计划（复用 plans 路由的落库逻辑）
 """
 from __future__ import annotations
 
 import json
-from datetime import date as _date
+from datetime import date as _date, timedelta as _td
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -305,6 +306,21 @@ def workout_comment(data: schemas.AiWorkoutCommentIn, db: Session = Depends(get_
         raise HTTPException(400, str(e)) from e
 
 
+@router.post("/activity-comment")
+def activity_comment(data: schemas.AiActivityCommentIn, db: Session = Depends(get_db)):
+    """任意活动记录的 AI 教练点评：结合训练状态与近期强度综合分析。
+
+    服务端路由：关联已完成课表课 → 课表点评（落 plan_workouts）；
+    其余 → 活动级综合分析（落 activities）。模型不可用自动退化规则点评。
+    """
+    athlete = require_athlete(db)
+    from ..services import coach_comment
+    try:
+        return coach_comment.generate_for_activity(db, athlete, data.activity_id, force=data.force)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
 @router.post("/assessment-interpretation")
 def assessment_interpretation(db: Session = Depends(get_db)):
     """评分页 AI 解读：五维得分/短板/目标差距/趋势全部由引擎装配进 prompt，
@@ -379,15 +395,20 @@ def _apply_profile_update(db: Session, athlete: models.Athlete, data) -> dict:
     return {"ok": True, "changes": checked["proposal"]["changes"]}
 
 
+def _pause_active_goals(db: Session, athlete_id: int) -> None:
+    """把该档案的全部活动目标置为 paused（新建目标前的整体替换语义，不 commit）。"""
+    for old in db.scalars(select(models.Goal).where(
+            models.Goal.athlete_id == athlete_id, models.Goal.status == "active")).all():
+        old.status = "paused"
+
+
 def _apply_goal_update(db: Session, athlete: models.Athlete, data) -> dict:
     if not data.changes:
         raise HTTPException(400, "缺少变更字段")
     # 先以当前活动目标为基线重检，再整体替换（旧目标归档，与 AI 建计划流程口径一致）
     checked = ai_tools.check_goal_update(db, athlete, data.changes)
     _checked_or_400(checked)
-    for old in db.scalars(select(models.Goal).where(
-            models.Goal.athlete_id == athlete.id, models.Goal.status == "active")).all():
-        old.status = "paused"
+    _pause_active_goals(db, athlete.id)
     vals = checked["_internal"]["new_values"]
     goal = models.Goal(athlete_id=athlete.id, status="active", priority="primary",
                        race_type=vals["race_type"], target_time_sec=vals["target_time_sec"],
@@ -515,6 +536,14 @@ def proposal_history(limit: int = 20, db: Session = Depends(get_db)):
     return {"history": proposal_store.list_history(db, athlete, limit)}
 
 
+@router.get("/coach-scorecard")
+def coach_scorecard(db: Session = Depends(get_db)):
+    """教练成绩单：提案采纳率、采纳后执行落地、逐周执行率对照（只读聚合）。"""
+    from ..services import coach_scorecard
+    athlete = require_athlete(db)
+    return coach_scorecard.build_scorecard(db, athlete)
+
+
 @router.post("/proposals/{proposal_id}/apply")
 def apply_engine_proposal(proposal_id: int, db: Session = Depends(get_db)):
     """采纳引擎建议：与对话提案同一批应用函数重检写入（两段式的「apply 重检」半边）。"""
@@ -555,7 +584,7 @@ def dismiss_engine_proposal(proposal_id: int, db: Session = Depends(get_db)):
 @router.post("/plan/from-text")
 def plan_from_text(data: schemas.AiPlanFromTextIn, db: Session = Depends(get_db)):
     """自由文本 → 结构化目标参数 + 引擎可行性预检（不落库，等用户确认）。"""
-    require_athlete(db)
+    athlete = require_athlete(db)
     text = (data.text or "").strip()
     if not text:
         raise HTTPException(400, "请描述你的目标")
@@ -564,7 +593,6 @@ def plan_from_text(data: schemas.AiPlanFromTextIn, db: Session = Depends(get_db)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
-    athlete = require_athlete(db)
     pred = build_prediction(db, athlete.id)
     if not pred.current_vdot:
         raise HTTPException(400, "暂无足够训练数据估算当前 VDOT，请先同步/录入近期的跑步记录")
@@ -579,10 +607,8 @@ def plan_from_text(data: schemas.AiPlanFromTextIn, db: Session = Depends(get_db)
     slots = ai_tools.active_slots(db, athlete.id)
     if not slots:
         raise HTTPException(400, "日程管理中还没有可训练时段，请先到「日程管理」添加")
-    from datetime import date as _d2
-    from datetime import timedelta as _td
-    start = _d2.today()
-    end = (_d2.fromisoformat(params["target_date"]) if params.get("target_date")
+    start = _date.today()
+    end = (_date.fromisoformat(params["target_date"]) if params.get("target_date")
            else start + _td(weeks=16))
     weeks = max(4, min(30, (end - start).days // 7))
     feasibility = planner.assess_feasibility(
@@ -598,9 +624,7 @@ def plan_confirm(data: schemas.AiPlanConfirmIn, db: Session = Depends(get_db)):
     from .plans import _create_plan_for_goal
 
     athlete = require_athlete(db)
-    for old in db.scalars(select(models.Goal).where(
-            models.Goal.athlete_id == athlete.id, models.Goal.status == "active")).all():
-        old.status = "paused"
+    _pause_active_goals(db, athlete.id)
     goal = models.Goal(
         athlete_id=athlete.id, race_type=data.race_type,
         target_time_sec=data.target_time_sec, target_label=data.target_label,

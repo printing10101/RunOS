@@ -12,7 +12,7 @@
     </template>
     <template v-else>
       <div class="ck-advice" :style="{ borderColor: adviceColor }">
-        <div class="ck-score num-display" :style="{ color: adviceColor }"><RollNum :value="checkin.advice?.score" /></div>
+        <!-- 建议引擎只出档位不出分数，这里不放假数字 -->
         <div class="ck-advice-body">
           <div class="ck-level">{{ adviceLabel }}
             <span v-if="fuelingTag" class="ck-fueling" :style="{ color: fuelingTag.color, borderColor: fuelingTag.color }">{{ fuelingTag.label }}</span>
@@ -30,8 +30,7 @@
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '../api'
-import RollNum from './RollNum.vue'
-import { todayStr } from '../utils/common'
+import { ADVICE_LEVEL_NAMES, todayStr } from '../utils/common'
 
 const checkin = ref({})
 // 打卡问卷项（key 必须与后端打卡 schema 的字段名一致）。
@@ -46,8 +45,7 @@ const CHECKIN_QUESTIONS = [
 const checkinForm = ref({ sleep_quality: 3, muscle_soreness: 0, energy_level: 3, motivation: 3 })
 const checkinPain = ref('')
 
-const ADVICE_LABELS = { normal: '按计划执行', reduce: '建议减量', easy: '仅轻松跑', rest: '今日休息' }
-const adviceLabel = computed(() => ADVICE_LABELS[checkin.value.advice?.level] || '')
+const adviceLabel = computed(() => ADVICE_LEVEL_NAMES[checkin.value.advice?.level] || '')
 // 补给状态徽标：能量亏缺由饮食联动判定（fueling 来自后端 checkin 建议）
 const fuelingTag = computed(() => {
   const lv = checkin.value.advice?.fueling_level
@@ -98,7 +96,6 @@ defineExpose({ loadCheckin })
 .ck-label { font-size: 12.5px; color: var(--text-2); }
 .ck-advice { display: flex; gap: 12px; align-items: center; border: 1px solid var(--border); border-left: 3px solid var(--border);
   border-radius: 10px; padding: 10px 12px; background: var(--bg-inset); }
-.ck-score { font-size: 32px; }
 .ck-level { font-weight: 800; font-size: 13.5px; }
 .ck-fueling { font-weight: 600; font-size: 11px; border: 1px solid; border-radius: 10px; padding: 0 7px; margin-left: 6px; }
 .ck-verdict { font-size: 11.5px; color: var(--text-2); line-height: 1.6; margin-top: 3px; }

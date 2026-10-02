@@ -27,8 +27,6 @@ export function normalizeApiError(err) {
     }[status] || `请求失败（${status}）`
     const e = new Error(text || fallback)
     e.status = status
-    // 保留原始 response，兼容既有调用点的 e.response?.data?.detail 写法
-    e.response = err.response
     return e
   }
   if (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT') {

@@ -44,9 +44,9 @@ describe('normalizeApiError', () => {
     expect(e.status).toBe(418)
   })
 
-  it('保留原始 response，兼容旧调用点的 e.response?.data?.detail', () => {
-    const resp = { status: 400, data: { detail: 'x' } }
-    expect(normalizeApiError({ response: resp }).response).toBe(resp)
+  it('错误对象不带原始 response：调用方统一读 e.message，不再走 e.response?.data?.detail', () => {
+    const e = normalizeApiError({ response: { status: 400, data: { detail: 'x' } } })
+    expect(e.response).toBeUndefined()
   })
 
   it('超时与断连没有 response，按 code 单独识别', () => {

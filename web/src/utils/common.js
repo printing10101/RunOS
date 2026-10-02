@@ -50,6 +50,15 @@ export const PLATFORM_NAMES = {
 }
 export function platName(p) { return PLATFORM_NAMES[p] || p }
 
+// 比赛项目 → 中文名，与后端 vdot.RACE_LABELS 同一份词汇
+// （other/any 是前端规划/记录域的补充项，后端预测引擎不认识它们）
+export const RACE_TYPE_NAMES = {
+  '800m': '800米', '1k': '1公里', '1500m': '1500米', '3k': '3公里',
+  '5k': '5公里', '10k': '10公里', hm: '半马', marathon: '全马',
+  other: '其他', any: '通用',
+}
+export function raceTypeName(k) { return RACE_TYPE_NAMES[k] || k }
+
 export const PHASE_NAMES = { base: '基础期', build: '强化期', peak: '巅峰期', taper: '减量期' }
 export const PHASE_COLORS = { base: '#5fc987', build: '#5f9fc9', peak: '#e05f5f', taper: '#d9a24e' }
 export function phaseName(p) { return PHASE_NAMES[p] || p }
@@ -100,4 +109,10 @@ export function acwrColor(v, fallback = '#5c6f68') {
   if (v > 1.3) return '#d9a24e'
   if (v >= 0.8) return '#5fc987'
   return '#5f9fc9'
+}
+
+// 打卡/伤病共用的建议档位中文名（与后端 checkin_advice._LADDER 同一套词汇，
+// 档位枚举别再直接漏给用户）
+export const ADVICE_LEVEL_NAMES = {
+  normal: '按计划执行', reduce: '建议减量', easy: '仅轻松跑', rest: '今日休息',
 }

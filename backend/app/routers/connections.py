@@ -639,6 +639,13 @@ def _execute_sync_locked(db: Session, row: models.PlatformConnection, *, since_d
             on_activities_changed(db, row.athlete_id, new_ids)
         except Exception:
             logger.exception("同步后置处理失败（不影响同步本身） athlete=%s", row.athlete_id)
+        # 每条新活动都补一条教练分析（后台线程排队串行出，失败只落日志）
+        try:
+            from ..services import coach_comment
+            for aid in new_ids:
+                coach_comment.regenerate_activity_async(aid)
+        except Exception:
+            logger.exception("活动点评批量触发失败（不影响同步本身） athlete=%s", row.athlete_id)
 
     return {"ok": True, "fetched": len(acts), "added": added,
             "backfilled": backfilled, "laps_backfilled": laps_backfilled,
@@ -775,13 +782,21 @@ def reset_data(confirm: bool = False, db: Session = Depends(get_db)):
     """
     if not confirm:
         raise HTTPException(400, "请携带 confirm=true 确认执行")
+    # 语义：训练/身体/由它们派生的数据全清（预测快照、官方体能快照、伤病/环境/
+    # 晨报、教练记忆、未决提案都挂在训练数据上，留着会串旧数据）；
+    # 保留：平台连接、跑者档案/目标/日程（用户配置）与 AI 对话历史。
     cleared = {}
     for name, model in (("activities", models.Activity), ("gears", models.Gear),
                         ("race_results", models.RaceResult), ("daily_checkins", models.DailyCheckin),
                         ("body_metrics", models.BodyMetric),
                         ("strength_tests", models.StrengthTest), ("diet_logs", models.DietLog),
                         ("assessments", models.Assessment), ("plan_workouts", models.PlanWorkout),
-                        ("plan_weeks", models.PlanWeek), ("training_plans", models.TrainingPlan)):
+                        ("plan_weeks", models.PlanWeek), ("training_plans", models.TrainingPlan),
+                        ("race_predictions", models.RacePrediction),
+                        ("fitness_snapshots", models.FitnessSnapshot),
+                        ("injury_logs", models.InjuryLog), ("weather_logs", models.WeatherLog),
+                        ("coach_briefs", models.CoachBrief), ("coach_notes", models.CoachNote),
+                        ("ai_proposals", models.AiProposal)):
         rows = db.scalars(select(model)).all()
         for r in rows:
             db.delete(r)

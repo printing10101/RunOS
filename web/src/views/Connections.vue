@@ -370,7 +370,8 @@ async function showFitness() {
 }
 
 async function disconnect(key) {
-  await ElMessageBox.confirm(`断开后将删除已保存的授权凭据，再次使用需重新授权。确定断开${platName(key)}？`, '断开平台连接', { type: 'warning' })
+  const ok = await ElMessageBox.confirm(`断开后将删除已保存的授权凭据，再次使用需重新授权。确定断开${platName(key)}？`, '断开平台连接', { type: 'warning' }).catch(() => false)
+  if (!ok) return
   try {
     await api.post(`/connections/${key}/disconnect`, {})
     await load()

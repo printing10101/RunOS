@@ -61,10 +61,6 @@
       <div class="metric"><div class="num-display m-val">{{ Math.round(d.elevation_m) }}</div><div class="m-label">累计爬升 m</div></div>
       <div class="metric" v-if="d.calories"><div class="num-display m-val">{{ d.calories }}</div><div class="m-label">卡路里 kcal</div></div>
       <div class="metric" v-if="d.avg_power"><div class="num-display m-val">{{ d.avg_power }}</div><div class="m-label">平均功率 W</div></div>
-      <div class="metric" v-else-if="d.estimated_power">
-        <div class="num-display m-val">{{ d.estimated_power.watts }}<span class="m-sub"> · {{ d.estimated_power.w_per_kg }}W/kg</span></div>
-        <div class="m-label">{{ d.estimated_power.basis }}</div>
-      </div>
       <div class="metric"><div class="num-display m-val">{{ Math.round(d.training_load) }}</div><div class="m-label">训练负荷</div></div>
       <div class="metric" v-if="d.te_aerobic != null">
         <div class="num-display m-val">{{ d.te_aerobic.toFixed(1) }}<span v-if="d.te_anaerobic != null" class="m-sub"> / {{ d.te_anaerobic.toFixed(1) }}</span></div>
@@ -73,23 +69,23 @@
       <div class="metric" v-if="d.rpe"><div class="num-display m-val">{{ d.rpe }}</div><div class="m-label">RPE 主观强度</div></div>
     </div>
 
-    <!-- 关联课表课的 AI 教练点评 -->
-    <el-card shadow="never" style="margin-top:14px" v-if="d.plan_workout">
+    <!-- AI 教练点评：每条活动记录都有（关联课表课时对照处方分析，其余综合近期状态分析） -->
+    <el-card shadow="never" style="margin-top:14px">
       <template #header>
         <div class="card-head" style="display:flex; align-items:center; gap:8px">
           <span>AI 教练点评
-            <span class="card-sub">课表课「{{ d.plan_workout.title }}」 · {{ d.plan_workout.date }}</span>
+            <span v-if="d.plan_workout" class="card-sub">课表课「{{ d.plan_workout.title }}」 · {{ d.plan_workout.date }}</span>
           </span>
           <el-button size="small" link type="primary" style="margin-left:auto"
                      :loading="commentLoading"
-                     @click="makeComment(!!d.plan_workout.coach_comment)">
-            {{ d.plan_workout.coach_comment ? '重新点评' : '生成点评' }}
+                     @click="makeComment(!!coachComment)">
+            {{ coachComment ? '重新分析' : '生成分析' }}
           </el-button>
         </div>
       </template>
-      <div v-if="d.plan_workout.coach_comment" class="coach-comment">{{ d.plan_workout.coach_comment }}</div>
+      <div v-if="coachComment" class="coach-comment">{{ coachComment }}</div>
       <div v-else class="coach-empty">
-        还没有点评<template v-if="d.plan_workout.status !== 'completed'">（该课尚未标记完成，完成打卡后才能生成）</template>
+        还没有分析，点「生成分析」让教练结合你的训练状态和近期强度点评这节课
       </div>
     </el-card>
 
@@ -252,19 +248,25 @@ async function delActivity() {
   }
 }
 
-// 训练后 AI 点评（关联课表课时展示）
+// AI 教练点评：活动级（activities.coach_comment）优先，关联课有课表点评时兜底展示
 const commentLoading = ref(false)
+const coachComment = computed(() =>
+  d.value?.coach_comment || d.value?.plan_workout?.coach_comment || '')
 
 async function makeComment(force) {
   commentLoading.value = true
   try {
-    const r = await api.post('/ai/workout-comment',
-                             { workout_id: d.value.plan_workout.workout_id, force })
-    d.value.plan_workout.coach_comment = r.comment
-    d.value.plan_workout.coach_comment_at = r.at
-    ElMessage.success(r.source === 'rule' ? '已生成规则点评（本地模型未就绪）' : 'AI 点评已生成')
+    // 点评走 _LLM_GATE 串行（首同步批量点评排队时最长可等 90s），前端超时放宽到 180s
+    const r = await api.post('/ai/activity-comment', { activity_id: d.value.id, force }, { timeout: 180000 })
+    d.value.coach_comment = r.comment
+    d.value.coach_comment_at = r.at
+    if (r.target === 'workout' && d.value.plan_workout) {
+      d.value.plan_workout.coach_comment = r.comment
+      d.value.plan_workout.coach_comment_at = r.at
+    }
+    ElMessage.success(r.source === 'rule' ? '已生成规则分析（本地模型未就绪）' : 'AI 分析已生成')
   } catch (e) {
-    ElMessage.error(e.message || '点评生成失败')
+    ElMessage.error(e.message || '分析生成失败')
   } finally { commentLoading.value = false }
 }
 

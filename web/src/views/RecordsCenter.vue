@@ -13,7 +13,7 @@
           <el-table-column prop="date" label="日期" width="110" />
           <el-table-column prop="race_name" label="赛事" min-width="140" />
           <el-table-column label="项目" width="90">
-            <template #default="{ row }">{{ raceTypeLabel(row.race_type) }}</template>
+            <template #default="{ row }">{{ raceTypeName(row.race_type) }}</template>
           </el-table-column>
           <el-table-column prop="time_str" label="成绩" width="100" />
           <el-table-column prop="pace_str" label="配速" width="100" />
@@ -54,7 +54,7 @@
             <el-form-item label="项目">
               <el-select v-model="raceForm.race_type" style="width:100%">
                 <el-option v-for="rt in ['800m', '1k', '1500m', '3k', '5k', '10k', 'hm', 'marathon', 'other']" :key="rt"
-                           :label="raceTypeLabel(rt)" :value="rt" />
+                           :label="raceTypeName(rt)" :value="rt" />
               </el-select>
             </el-form-item>
             <el-form-item label="距离 (米)">
@@ -133,17 +133,13 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import TabPage from '../components/TabPage.vue'
 import Activities from './Activities.vue'
 import { api } from '../api'
-import { todayStr } from '../utils/common'
+import { raceTypeName, todayStr } from '../utils/common'
 
 const tab = ref('activities')
-
-const RACE_TYPES = { '800m': '800米', '1k': '1公里', '1500m': '1500米', '3k': '3公里',
-                    '5k': '5公里', '10k': '10公里', hm: '半马', marathon: '全马', other: '其他' }
-const raceTypeLabel = (t) => RACE_TYPES[t] || t
 
 // 偏差复盘：正值 = 比预测慢。±2% 内视为模型精准
 function deltaLabel(pct) {
@@ -182,6 +178,10 @@ async function saveRace() {
   } catch (e) { ElMessage.error(e.message || '保存失败') } finally { raceSaving.value = false }
 }
 async function removeRace(row) {
+  const ok = await ElMessageBox.confirm(
+    `确定删除「${row.race_name || row.date}」的比赛成绩？删除后预测校准不再统计这场`,
+    '删除比赛成绩', { type: 'warning' }).catch(() => false)
+  if (!ok) return
   await api.del(`/races/${row.id}`)
   await loadRaces()
 }
@@ -209,10 +209,14 @@ async function saveGear() {
   } catch (e) { ElMessage.error(e.message || '保存失败') } finally { gearSaving.value = false }
 }
 async function retireGear(g) {
+  const ok = await ElMessageBox.confirm(`确定退役「${g.name}」？退役后新活动不再关联它`, '退役装备', { type: 'warning' }).catch(() => false)
+  if (!ok) return
   await api.post(`/gear/${g.id}/retire`, {})
   await loadGear()
 }
 async function removeGear(g) {
+  const ok = await ElMessageBox.confirm(`确定删除「${g.name}」？关联它的历史活动会失去跑鞋归属`, '删除装备', { type: 'warning' }).catch(() => false)
+  if (!ok) return
   await api.del(`/gear/${g.id}`)
   await loadGear()
 }

@@ -3,9 +3,10 @@ import { ElMessage } from 'element-plus'
 import { api } from '../api'
 
 /**
- * 后端五个解读端点（assessment / weekly-recap / diet / prediction / plan-review）
- * 共用的状态机：POST → { review, source }。本地模型可能很慢（超时给到 180s），
- * 失败时后端已退规则版，前端只负责展示与错误提示。
+ * AI 解读端点的通用状态机：POST → { review, source }。本地模型可能很慢
+ * （超时给到 180s），失败时后端已退规则版，前端只负责展示与错误提示。
+ * 当前接入：weekly-recap（/ai/weekly-recap-review）；其余解读端点要挂
+ * 前端展示时复用这里，不要再各写一份 loading/catch。
  */
 export function useAiReview(url, { failTip = '解读生成失败', guard = null } = {}) {
   const review = ref('')

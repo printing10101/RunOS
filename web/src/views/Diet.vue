@@ -87,11 +87,11 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import * as echarts from 'echarts'
 import TabPage from '../components/TabPage.vue'
 import { api } from '../api'
 import { todayStr } from '../utils/common'
 import { axisStyle, tooltipStyle } from '../utils/echarts-theme'
+import { createChartManager } from '../composables/charts'
 
 const MEALS = { breakfast: '早餐', lunch: '午餐', dinner: '晚餐', snack: '加餐' }
 
@@ -103,7 +103,7 @@ const saving = ref(false)
 const logForm = ref({})
 const aiEstimating = ref(false)
 const balanceChart = ref(null)
-const charts = []
+const charts = createChartManager()
 
 const DAY_TYPES = { rest: '休息日', easy: '常规日', quality: '质量课', long: '长距离日' }
 
@@ -122,9 +122,7 @@ async function load() {
 function renderBalance() {
   const series = d.value.balance?.series || []
   if (!balanceChart.value || !series.length) return
-  const chart = echarts.init(balanceChart.value)
-  charts.push(chart)
-  chart.setOption({
+  charts.get('balance', balanceChart.value).setOption({
     grid: { left: 46, right: 46, top: 30, bottom: 26 },
     tooltip: { trigger: 'axis', ...tooltipStyle },
     legend: { textStyle: { color: '#8fada2' }, top: 0 },
@@ -163,13 +161,17 @@ async function saveLog() {
 }
 
 async function removeLog(row) {
+  const ok = await ElMessageBox.confirm(
+    `删除 ${row.date} ${MEALS[row.meal] || row.meal} 的记录（${row.kcal ?? 0} kcal）？`,
+    '删除饮食记录', { type: 'warning' }).catch(() => false)
+  if (!ok) return
   await api.del(`/diet/logs/${row.id}`)
   await load()
 }
 
 async function askAiEstimate() {
   const { value } = await ElMessageBox.prompt('描述这餐吃了什么，AI 按常见份量估算营养素', 'AI 估算一餐',
-    { inputPlaceholder: '如：牛肉面一碗 + 一个煎蛋', inputValue: '' })
+    { inputPlaceholder: '如：牛肉面一碗 + 一个煎蛋', inputValue: '' }).catch(() => ({}))
   if (!value) return
   aiEstimating.value = true
   try {
@@ -182,7 +184,7 @@ async function askAiEstimate() {
 }
 
 onMounted(load)
-onUnmounted(() => charts.forEach(c => c.dispose()))
+onUnmounted(() => charts.disposeAll())
 </script>
 
 <style scoped>

@@ -70,8 +70,7 @@
                 <span v-else-if="g.status === 'paused'" class="goal-badge paused">已搁置</span>
               </div>
               <div class="goal-meta">
-                {{ { '800m': '800米', '1k': '1公里', '1500m': '1500米', '3k': '3公里',
-                     '5k': '5公里', '10k': '10公里', hm: '半马', marathon: '全马' }[g.race_type] }}
+                {{ raceTypeName(g.race_type) }}
                 <template v-if="g.target_time_sec"> · 目标 {{ fmtTime(g.target_time_sec) }}</template>
                 <template v-if="g.target_date"> · {{ g.target_date }}</template>
                 <template v-if="g.progress == null && g.status === 'active'"> · 暂无预测，先攒数据</template>
@@ -138,6 +137,7 @@
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { api, fmtTime } from '../api'
+import { raceTypeName } from '../utils/common'
 
 const formRef = ref()
 const saving = ref(false)
@@ -298,7 +298,8 @@ async function addGoal() {
 }
 
 async function delGoal(id) {
-  await ElMessageBox.confirm('删除后引用该目标的进行中计划会一并归档，且影响评估/预测。确定删除？', '删除比赛目标', { type: 'warning' })
+  const ok = await ElMessageBox.confirm('删除后引用该目标的进行中计划会一并归档，且影响评估/预测。确定删除？', '删除比赛目标', { type: 'warning' }).catch(() => false)
+  if (!ok) return
   await api.del(`/athlete/goals/${id}`)
   ElMessage.success('已删除')
   await load()

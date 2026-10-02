@@ -52,7 +52,7 @@ def activity_detail(activity_id: int, db: Session = Depends(get_db)):
     if not act:
         raise HTTPException(404, "活动不存在")
     athlete = get_default_athlete(db)
-    return build_activity_detail(act, athlete)
+    return build_activity_detail(act, athlete, db=db)
 
 
 @router.post("")
@@ -75,6 +75,9 @@ def add_activity(data: schemas.ActivityIn, db: Session = Depends(get_db)):
     r.raw = {**(r.raw or {}), "training_load_source": source}
     db.add(r)
     db.commit()
+    # 新记录自动补一条教练分析（后台线程，失败只落日志）
+    from ..services import coach_comment
+    coach_comment.regenerate_activity_async(r.id)
     d = _activity_dict(r)
     d["record_card"] = build_result_card(r, db)
     return d

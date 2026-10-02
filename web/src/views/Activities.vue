@@ -72,7 +72,7 @@
         </el-table-column>
         <el-table-column label="来源" width="70">
           <template #default="{ row }">
-            <el-tag size="small" type="info" effect="plain">{{ { coros: '高驰', garmin: '佳明', manual: '手动' }[row.platform] }}</el-tag>
+            <el-tag size="small" type="info" effect="plain">{{ platName(row.platform) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="90" align="center">
@@ -155,6 +155,7 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api, fmtPace } from '../api'
+import { platName } from '../utils/common'
 
 const router = useRouter()
 const items = ref([])
@@ -176,7 +177,7 @@ function fmtDuration(sec) {
 
 function loadShoes() {
   api.get('/gear').then(d => {
-    shoes.value = d.items.filter(g => g.kind === 'shoe' && g.status === 'active')
+    shoes.value = (d.gears || []).filter(g => g.kind === 'shoe' && g.status === 'active')
   }).catch(() => {})
 }
 
@@ -208,7 +209,7 @@ async function showRowCard(row) {
     recordCard.value = await api.get(`/activities/${row.id}/card`)
     showCard.value = true
   } catch (e) {
-    ElMessage.error(e.response?.data?.detail || '拉取成绩卡失败')
+    ElMessage.error(e.message || '拉取成绩卡失败')
   }
 }
 
@@ -238,7 +239,7 @@ async function save() {
       ElMessage.success('已录入')
     }
   } catch (e) {
-    ElMessage.error(e.response?.data?.detail || '录入失败')
+    ElMessage.error(e.message || '录入失败')
   }
 }
 

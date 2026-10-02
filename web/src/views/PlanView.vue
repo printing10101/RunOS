@@ -81,7 +81,7 @@
                   </el-button>
                 </div>
                 <el-tag v-if="wo.pushed_platforms?.length" size="small" type="success" effect="plain" style="margin-top:6px">
-                  ✓ {{ wo.pushed_platforms.map(p => ({ garmin: '佳明', coros: '高驰' }[p])).join('/') }}
+                  ✓ {{ wo.pushed_platforms.map(p => platName(p)).join('/') }}
                 </el-tag>
                 <div v-if="wo.status === 'completed'" class="wo-comment" @click.stop>
                   <div v-if="analysisBadge(wo)" class="wc-analysis">
@@ -150,7 +150,7 @@
 
       <template v-if="aiParsed">
         <el-divider />
-        <div class="ai-parse-row"><span>项目</span><b>{{ { '800m': '800米', '1k': '1公里', '1500m': '1500米', '3k': '3公里', '5k': '5 公里', '10k': '10 公里', hm: '半程马拉松', marathon: '马拉松' }[aiParsed.race_type] }}</b></div>
+        <div class="ai-parse-row"><span>项目</span><b>{{ raceTypeName(aiParsed.race_type) }}</b></div>
         <div class="ai-parse-row"><span>标签</span><b>{{ aiParsed.target_label || '—' }}</b></div>
         <div class="ai-parse-row"><span>目标成绩</span><b>{{ targetStr }}</b></div>
         <div class="ai-parse-row"><span>比赛日期</span><b>{{ aiParsed.target_date || '未指定（默认 16 周）' }}</b></div>
@@ -172,7 +172,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api, SESSION_STYLE } from '../api'
-import { platName, phaseName, phaseColor, downloadFile, localDateStr, parseLocalDate, todayStr } from '../utils/common'
+import { platName, phaseName, phaseColor, downloadFile, localDateStr, parseLocalDate, todayStr, raceTypeName, PHASE_NAMES, PHASE_COLORS } from '../utils/common'
+import { useWorkoutPush } from '../composables/useWorkoutPush'
 
 const plan = ref(null)
 const goals = ref([])
@@ -183,14 +184,11 @@ const showSteps = ref(false)
 const stepsWo = ref(null)
 const generating = ref(false)
 const loading = ref(true)
-const pushingId = ref(null)
 const genForm = ref({ goal_id: null, start_date: null, weekly_km_peak: null })
 
 const WEEKDAY = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
-const phases = [
-  { k: 'base', t: '基础期', c: '#5fc987' }, { k: 'build', t: '强化期', c: '#5f9fc9' },
-  { k: 'peak', t: '巅峰期', c: '#e05f5f' }, { k: 'taper', t: '减量期', c: '#d9a24e' },
-]
+// 阶段名与配色由 utils 常量派生（与周复盘等处同一套色）
+const phases = Object.entries(PHASE_NAMES).map(([k, t]) => ({ k, t, c: PHASE_COLORS[k] }))
 
 const connectedAny = computed(() => conn.value.connections.some(c => c.status === 'connected'))
 
@@ -319,23 +317,8 @@ async function confirmAi() {
   } finally { generating.value = false }
 }
 
-async function pushWo(wo) {
-  // 与后端能力一致：只发支持写入的平台；已成功过的平台由后端按 pushed_platforms 幂等跳过
-  const opts = ['garmin', 'strava'].filter(p => conn.value.connections.some(c => c.platform === p && c.status === 'connected'))
-  if (!opts.length) { ElMessage.warning('请先在「平台连接」页绑定佳明 / Strava（高驰暂未开放训练写入，可下载 FIT 手动导入）'); return }
-  pushingId.value = wo.id
-  try {
-    const r = await api.post(`/plan/workouts/${wo.id}/push`, { platforms: opts })
-    if (!r.pushed.length) {
-      ElMessage.error(r.results?.filter(x => !x.ok).map(x => `${platName(x.platform)}：${x.error}`).join('；') || '下发失败')
-    } else {
-      ElMessage.success(`已下发：${r.pushed.map(platName).join('、')}，打开对应 App 同步到手表即可`)
-    }
-    await load()
-  } catch (e) {
-    ElMessage.error(e.message || '下发失败')
-  } finally { pushingId.value = null }
-}
+// 课表下发/FIT 导出与总览页共用一个 composable；下发完成后刷新整页数据
+const { pushingId, pushWorkout: pushWo, downloadFit } = useWorkoutPush(load)
 
 function openSteps(wo) {
   if (!wo.structured?.length) { ElMessage.info('该课没有结构化步骤'); return }
@@ -371,7 +354,8 @@ const commentTimers = {}
 async function makeComment(wo, force = false) {
   commentLoading.value[wo.id] = true
   try {
-    const r = await api.post('/ai/workout-comment', { workout_id: wo.id, force })
+    // 点评走 _LLM_GATE 串行（首同步批量点评排队时最长可等 90s），前端超时放宽到 180s
+    const r = await api.post('/ai/workout-comment', { workout_id: wo.id, force }, { timeout: 180000 })
     wo.coach_comment = r.comment
     wo.coach_comment_at = r.at
     commentPending.value[wo.id] = false
@@ -393,11 +377,6 @@ function scheduleCommentPoll(workoutId) {
 }
 
 onUnmounted(() => { Object.values(commentTimers).forEach(clearTimeout) })
-
-async function downloadFit(wo) {
-  await downloadFile(`/api/plan/workouts/${wo.id}/fit`, `workout_${wo.date}.fit`,
-    { successTip: '已导出 FIT 文件，可在高驰/佳明 App 中导入' })
-}
 
 async function downloadIcs() {
   await downloadFile('/api/plan/calendar.ics', 'training_plan.ics',
