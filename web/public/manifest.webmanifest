@@ -1,0 +1,18 @@
+{
+  "name": "RunOS — 训练 · 评估 · 预测",
+  "short_name": "RunOS",
+  "description": "本地优先的跑步训练数据平台：同步、课表、AI 教练，数据不出本机。",
+  "lang": "zh-CN",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#081210",
+  "theme_color": "#081210",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

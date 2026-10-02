@@ -73,7 +73,7 @@
 
     <el-row :gutter="14">
       <!-- 今日训练 HERO -->
-      <el-col :span="16">
+      <el-col :span="16" :xs="24">
         <el-card shadow="never" class="hero" :class="'hero-' + (d.next_workout?.session_type || 'rest')">
           <template #header>
             <div class="hero-head">
@@ -181,7 +181,7 @@
       </el-col>
 
       <!-- 右列：数据环 + 跑者类型 -->
-      <el-col :span="8">
+      <el-col :span="8" :xs="24">
         <el-card shadow="never">
           <template #header><div class="card-head">身体与负荷</div></template>
           <div class="rings">
@@ -217,13 +217,13 @@
     </el-row>
 
     <el-row :gutter="14" style="margin-top:14px">
-      <el-col :span="16">
+      <el-col :span="16" :xs="24">
         <el-card shadow="never">
           <template #header><div class="card-head">近 12 周跑量 <span class="card-sub">km / 周</span></div></template>
           <div ref="kmChart" style="height: 240px"></div>
         </el-card>
       </el-col>
-      <el-col :span="8">
+      <el-col :span="8" :xs="24">
         <el-card shadow="never">
           <template #header><div class="card-head">最近训练 <span class="card-sub">点击查看详情</span></div></template>
           <div v-for="a in d.recent_activities" :key="a.id" class="recent-row" @click="$router.push(`/activities/${a.id}`)">
@@ -485,6 +485,18 @@ onUnmounted(() => {
 
 <style scoped>
 .today-head { display: flex; align-items: flex-end; justify-content: space-between; }
+
+/* 手机端（PWA 打卡路径）：分栏堆叠、状态条换行、字号收敛 */
+@media (max-width: 768px) {
+  .today-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .head-chips .el-tag { margin-left: 0; margin-right: 8px; }
+  .status-strip { flex-wrap: wrap; row-gap: 8px; }
+  .ss-more { margin-left: 0; }
+  .hero-title { font-size: 21px; }
+  .hm-num { font-size: 36px; }
+  .el-col + .el-col { margin-top: 14px; }
+}
+
 .brief-card { margin-top: 14px; }
 .brief-body { display: flex; align-items: center; gap: 10px; }
 .brief-icon { font-size: 20px; }

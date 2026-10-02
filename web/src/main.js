@@ -24,3 +24,10 @@ app.config.errorHandler = (err) => {
 }
 
 app.mount('#app')
+
+// PWA 可安装性：仅生产环境注册最小 Service Worker（web/public/sw.js 只透传不缓存）。
+// 注册失败只影响「安装到主屏幕」，不影响任何功能——warn 留痕即可。
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(
+    err => console.warn('[pwa] service worker 注册失败（不影响使用）:', err))
+}

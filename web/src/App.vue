@@ -1,5 +1,30 @@
 <template>
   <XianxiaBackdrop />
+
+  <!-- 移动端顶栏 + 抽屉导航：窄屏隐藏侧栏（打卡等日常动作多在手机上完成） -->
+  <div class="mobile-topbar">
+    <button class="mt-burger" aria-label="打开导航" @click="menuOpen = true">☰</button>
+    <span class="mt-brand">RunOS</span>
+  </div>
+  <el-drawer v-model="menuOpen" direction="ltr" size="236px" :with-header="false">
+    <div class="drawer-nav">
+      <div class="brand" style="padding: 4px 6px 14px">
+        <div class="brand-logo">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+            <ellipse cx="12" cy="14" rx="9" ry="5.5" stroke="#081210" stroke-width="2.4"/>
+            <circle cx="17.5" cy="6" r="2.6" fill="#081210"/>
+          </svg>
+        </div>
+        <div class="brand-name">RunOS</div>
+      </div>
+      <el-menu :default-active="$route.path" router @select="menuOpen = false">
+        <el-menu-item v-for="n in NAV" :key="n.path" :index="n.path">
+          <span class="mi">{{ n.icon }}</span>{{ n.label }}
+        </el-menu-item>
+      </el-menu>
+    </div>
+  </el-drawer>
+
   <el-container class="app-shell">
     <el-aside width="216px" class="app-aside">
       <div class="brand">
@@ -16,16 +41,9 @@
       </div>
 
       <el-menu :default-active="$route.path" router class="app-menu">
-        <el-menu-item index="/"><span class="mi">◆</span>今日</el-menu-item>
-        <el-menu-item index="/plan"><span class="mi">▤</span>训练计划</el-menu-item>
-        <el-menu-item index="/activities"><span class="mi">≡</span>训练记录</el-menu-item>
-        <el-menu-item index="/status"><span class="mi">◷</span>训练状态</el-menu-item>
-        <el-menu-item index="/analysis"><span class="mi">◈</span>分析</el-menu-item>
-        <el-menu-item index="/stats"><span class="mi">◫</span>数据报表</el-menu-item>
-        <el-menu-item index="/diet"><span class="mi">◍</span>饮食</el-menu-item>
-        <el-menu-item index="/coach"><span class="mi">✦</span>AI 教练</el-menu-item>
-        <el-menu-item index="/library"><span class="mi">❖</span>训练知识库</el-menu-item>
-        <el-menu-item index="/settings"><span class="mi">✎</span>设置</el-menu-item>
+        <el-menu-item v-for="n in NAV" :key="n.path" :index="n.path">
+          <span class="mi">{{ n.icon }}</span>{{ n.label }}
+        </el-menu-item>
       </el-menu>
 
       <div class="aside-footer" v-if="athlete" @click="$router.push('/profile')">
@@ -67,6 +85,22 @@ const athlete = ref(null)
 const runnerType = ref('')
 const vdot = ref('-')
 const showOnboarding = ref(false)
+const menuOpen = ref(false)
+
+// 侧栏与移动端抽屉共用一份导航清单（加页面时两处同步出现）
+const NAV = [
+  { path: '/', icon: '◆', label: '今日' },
+  { path: '/plan', icon: '▤', label: '训练计划' },
+  { path: '/activities', icon: '≡', label: '训练记录' },
+  { path: '/status', icon: '◷', label: '训练状态' },
+  { path: '/analysis', icon: '◈', label: '分析' },
+  { path: '/stats', icon: '◫', label: '数据报表' },
+  { path: '/diet', icon: '◍', label: '饮食' },
+  { path: '/coach', icon: '✦', label: 'AI 教练' },
+  { path: '/library', icon: '❖', label: '训练知识库' },
+  { path: '/profile', icon: '☺', label: '个人档案' },
+  { path: '/settings', icon: '✎', label: '设置' },
+]
 const age = computed(() =>
   athlete.value ? new Date().getFullYear() - athlete.value.birth_year : '-')
 
@@ -139,6 +173,26 @@ watch(() => route.path, (p, prev) => {
 .af-meta { color: var(--text-3); font-size: 11px; margin-top: 3px; }
 
 .app-main { padding: 22px 28px; max-width: 1280px; margin: 0 auto; width: 100%; }
+
+/* ---- 移动端（打卡等日常动作多在手机上完成）：隐藏侧栏，顶栏 + 抽屉导航 ---- */
+.mobile-topbar { display: none; }
+.mt-burger {
+  background: none; border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; font-size: 16px; line-height: 1; padding: 6px 10px; cursor: pointer;
+}
+.mt-brand { font-weight: 800; letter-spacing: 0.02em; }
+
+@media (max-width: 820px) {
+  .app-aside { display: none; }
+  .mobile-topbar {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    position: sticky; top: 0; z-index: 30;
+    background: rgba(8, 18, 16, 0.92); backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--border);
+  }
+  .app-main { padding: 14px; }
+}
+.drawer-nav { padding: 14px 6px; }
 </style>
 
 <style>
