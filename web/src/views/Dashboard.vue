@@ -486,17 +486,6 @@ onUnmounted(() => {
 <style scoped>
 .today-head { display: flex; align-items: flex-end; justify-content: space-between; }
 
-/* 手机端（PWA 打卡路径）：分栏堆叠、状态条换行、字号收敛 */
-@media (max-width: 768px) {
-  .today-head { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .head-chips .el-tag { margin-left: 0; margin-right: 8px; }
-  .status-strip { flex-wrap: wrap; row-gap: 8px; }
-  .ss-more { margin-left: 0; }
-  .hero-title { font-size: 21px; }
-  .hm-num { font-size: 36px; }
-  .el-col + .el-col { margin-top: 14px; }
-}
-
 .brief-card { margin-top: 14px; }
 .brief-body { display: flex; align-items: center; gap: 10px; }
 .brief-icon { font-size: 20px; }
@@ -570,4 +559,19 @@ onUnmounted(() => {
 
 .recent-row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px dashed rgba(157,184,173,.12); font-size: 13px; }
 .recent-meta { color: var(--text-3); font-size: 12px; margin-left: 8px; }
+
+/* 手机端（PWA 打卡路径）：分栏堆叠、状态条换行、字号收敛。
+   必须放在本 style 块末尾——同特异性规则后者赢，放前面会被上方基础规则盖回。 */
+@media (max-width: 768px) {
+  .today-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .head-chips .el-tag { margin-left: 0; margin-right: 8px; }
+  .status-strip { flex-wrap: wrap; row-gap: 8px; }
+  .ss-more { margin-left: 0; }
+  .hero-title { font-size: 21px; }
+  .hm-num { font-size: 36px; }
+  .el-col + .el-col { margin-top: 14px; }
+  /* 配速步骤 5 列摊不开、三个数据环并排超宽：窄屏改为可换行，不再顶破卡片 */
+  .pace-strip { grid-template-columns: repeat(2, 1fr); }
+  .rings { flex-wrap: wrap; gap: 10px; justify-content: center; }
+}
 </style>

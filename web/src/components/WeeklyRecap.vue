@@ -1,13 +1,13 @@
 <template>
   <el-alert v-if="recapError" type="info" title="本周复盘暂时加载失败，其余数据不受影响" :closable="false"
             style="margin-top:14px" show-icon />
-  <el-card ref="cardRef" shadow="never" style="margin-top:14px" v-if="recap && !recap.empty">
+  <el-card ref="printTarget" shadow="never" style="margin-top:14px" v-if="recap && !recap.empty">
     <template #header>
       <div class="card-head">本周复盘 <span class="card-sub">{{ recap.week?.range }} · 每周自动 · {{ weekPhaseName }}</span>
         <el-button size="small" text bg class="recap-ai-btn" :loading="recapReviewLoading"
                    @click="loadReview">AI 点评</el-button>
         <el-button size="small" text bg class="recap-ai-btn" style="margin-left:0"
-                   :loading="exporting" @click="exportPng">导出图片</el-button>
+                   @click="printCard">导出 PDF</el-button>
       </div>
     </template>
     <div class="recap-lead">📋 {{ recap.lead }}</div>
@@ -47,11 +47,10 @@
 <script setup>
 // 每周自动复盘卡片：跑后环节的本周数据 + 下周预览；父组件经 ref 调 loadRecap() 刷新
 import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import { api } from '../api'
 import RollNum from './RollNum.vue'
 import { phaseName, acwrColor } from '../utils/common'
-import { exportElementPng } from '../utils/exportImage'
+import { printElement } from '../utils/exportPrint'
 import { useAiReview } from '../composables/aiReview'
 
 const recap = ref({})
@@ -77,20 +76,11 @@ function loadRecap() {
   }).catch(() => { recapError.value = true })
 }
 
-// 分享出口：把整张复盘卡截图成 PNG（可分享进聊天/相册），文件名带周期起始日
-const cardRef = ref(null)
-const exporting = ref(false)
-async function exportPng() {
-  if (exporting.value) return
-  exporting.value = true
-  try {
-    const day = recap.value.week?.range?.split('–')[0]?.replace('/', '') ?? ''
-    const name = `runos_weekly_recap_${day || new Date().toISOString().slice(0, 10)}.png`
-    await exportElementPng(cardRef.value?.$el, name)
-    ElMessage.success('已导出本周复盘图片')
-  } catch (e) {
-    ElMessage.error(e?.message || '导出失败')
-  } finally { exporting.value = false }
+// 分享出口：只打印这一块（系统打印预览里「另存为 PDF」）。
+// 不用 html2canvas 截图——实测它在重装饰页面上同步渲染死循环（主线程卡死）。
+const printTarget = ref(null)
+function printCard() {
+  printElement(printTarget.value?.$el)
 }
 
 defineExpose({ loadRecap })
