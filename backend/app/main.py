@@ -106,7 +106,7 @@ app.include_router(system.router)
 
 @app.get("/api/health")
 def health():
-    return {"ok": True, "service": "sport-platform"}
+    return {"ok": True, "service": "runos"}
 
 
 @app.post("/api/app/shutdown")
