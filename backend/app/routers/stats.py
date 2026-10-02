@@ -160,3 +160,35 @@ def calendar_days(days: int = 365, db: Session = Depends(get_db)):
         d["load"] += r.training_load or 0
         d["sessions"] += 1
     return {"items": [{**v, "km": round(v["km"], 1), "load": round(v["load"])} for v in by_day.values()]}
+
+
+@router.get("/response-curves")
+def response_curves(db: Session = Depends(get_db)):
+    """个人响应曲线：各课型次日 HRV 反应 + 硬课 HRV 恢复时长中位数（只读聚合）。"""
+    from ..services import response_curves as rc
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "types": [], "recovery": None}
+    return {"empty": False,
+            "types": rc.workout_type_response(db, athlete),
+            "recovery": rc.recovery_profile(db, athlete)}
+
+
+@router.get("/prediction-trend")
+def prediction_trend(race_type: str | None = None, db: Session = Depends(get_db)):
+    """预测演变曲线：本地引擎逐日预测快照 × 官方当期预测对照，按比赛分组。"""
+    from ..services.prediction_trend import build_prediction_trend
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "races": []}
+    return build_prediction_trend(db, athlete.id, race_type=race_type)
+
+
+@router.get("/prediction-calibration")
+def prediction_calibration(db: Session = Depends(get_db)):
+    """预测校准报告：历次「赛前预测 → 实测」偏差汇总（赛时计划可信度同源）。"""
+    from ..services.prediction_trend import calibration_summary
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "n": 0, "items": []}
+    return calibration_summary(db, athlete.id)

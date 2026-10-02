@@ -29,8 +29,39 @@
           <template #header><div class="card-head">恢复 · 负荷比</div></template>
           <div class="rec-row"><span class="rec-k">恢复时间</span><span class="num-display rec-v">{{ d.recovery_time_h }}<span class="rec-u">h</span></span></div>
           <div class="rec-row"><span class="rec-k">急慢性负荷比 ACWR</span>
-            <span class="num-display rec-v" :style="{ color: acwrColor }">{{ d.acwr ?? '-' }}</span></div>
+            <span class="num-display rec-v" :style="{ color: acwrTone }">{{ d.acwr ?? '-' }}</span></div>
           <div class="rec-note">ACWR 安全区 0.8 – 1.3；>1.5 伤病风险显著上升</div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-row v-if="cc && !cc.empty" :gutter="14" style="margin-top:14px">
+      <el-col :span="12">
+        <el-card shadow="never">
+          <template #header><div class="card-head">官方 ↔ 本地负荷对照 <span class="card-sub">高驰 load_ratio × 本地 ACWR</span></div></template>
+          <template v-if="cc.load_divergence?.days_compared">
+            <div v-if="cc.load_divergence.triggered" class="cc-alert">⚠ {{ cc.load_divergence.detail }}</div>
+            <div v-else class="cc-ok">✓ 近 {{ cc.load_divergence.days_compared }} 个可比日两套口径判断一致</div>
+          </template>
+          <el-empty v-else description="官方负荷比或本地负荷数据不足，暂无可比日" :image-size="60" />
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card shadow="never">
+          <template #header><div class="card-head">官方 VO2max 走向 <span class="card-sub">本地 VDOT 之外的第二意见</span></div></template>
+          <div class="mono-row" v-if="cc.vo2max_trend?.latest != null">
+            <div class="mono-item">
+              <div class="num-display mono-num">{{ cc.vo2max_trend.latest }}</div>
+              <div class="mono-label">最新（{{ cc.vo2max_trend.latest_date }}）</div>
+            </div>
+            <div class="mono-item">
+              <div class="num-display mono-num" :style="{ color: vo2DeltaColor }">
+                {{ cc.vo2max_trend.delta == null ? '-' : (cc.vo2max_trend.delta > 0 ? '+' : '') + cc.vo2max_trend.delta }}
+              </div>
+              <div class="mono-label">对比 28 天前基线</div>
+            </div>
+          </div>
+          <div class="mono-verdict" v-if="cc.vo2max_trend?.detail">{{ cc.vo2max_trend.detail }}</div>
         </el-card>
       </el-col>
     </el-row>
@@ -207,10 +238,18 @@ import { api } from '../api'
 import RingGauge from '../components/RingGauge.vue'
 import { axisStyle, tooltipStyle, splitLineStyle, legendStyle } from '../utils/echarts-theme'
 import { createChartManager } from '../composables/charts'
+import { acwrColor } from '../utils/common'
 
 const d = ref({ empty: true })
 const fc = ref({})
 const pi = ref({})          // /training-status/pro-insights：解耦 / 疲劳抗性等进阶洞察
+// 官方↔本地交叉校验（未同步官方快照时 empty，整块不渲染）
+const cc = computed(() => d.value.crosscheck || null)
+const vo2DeltaColor = computed(() => {
+  const v = cc.value?.vo2max_trend?.delta
+  if (v == null) return '#dce8e2'
+  return v >= 1 ? 'var(--jade)' : v <= -1 ? 'var(--red)' : '#dce8e2'
+})
 const loadError = ref('')
 const loading = ref(true)
 const loadChart = ref(null)
@@ -249,11 +288,8 @@ const readyColor = computed(() => {
   const s = d.value.readiness?.score || 0
   return s >= 80 ? '#5fc987' : s >= 60 ? '#d9a24e' : '#e05f5f'
 })
-const acwrColor = computed(() => {
-  const v = d.value.acwr
-  if (v == null) return '#dce8e2'
-  return v >= 0.8 && v <= 1.3 ? '#5fc987' : v > 1.5 ? '#e05f5f' : '#d9a24e'
-})
+// ACWR 配色统一走 utils/acwrColor（<0.8 负荷不足是蓝色，别再内联出橙色分歧）
+const acwrTone = computed(() => acwrColor(d.value.acwr, '#dce8e2'))
 const monoColor = computed(() => {
   const v = d.value.monotony?.monotony
   if (v == null) return '#dce8e2'
@@ -372,6 +408,8 @@ onUnmounted(charts.disposeAll)
 .mono-label { font-size: 11px; color: var(--text-3); margin-top: 4px; }
 .mono-verdict { font-size: 12.5px; color: var(--text-2); line-height: 1.65; margin-top: 10px; }
 .mono-warn { font-size: 12px; color: var(--orange); line-height: 1.65; margin-top: 6px; }
+.cc-alert { font-size: 13px; color: var(--orange); line-height: 1.7; }
+.cc-ok { font-size: 13px; color: var(--jade); line-height: 1.7; }
 .focus-bar { display: flex; height: 26px; border-radius: 7px; overflow: hidden; margin-top: 6px; }
 .fb-seg { height: 100%; }
 .focus-pcts { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; margin-top: 6px; }

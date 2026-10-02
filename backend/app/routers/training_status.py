@@ -10,6 +10,7 @@ from ..data import (
     active_plan,
     activities_dicts,
     athlete_dict,
+    build_prediction,
     build_training_status_for,
     get_default_athlete,
     planned_workouts,
@@ -27,6 +28,10 @@ def training_status(db: Session = Depends(get_db)):
     payload, _ = build_training_status_for(db, athlete)
     payload["athlete"] = {"name": athlete.name, "max_hr": athlete.max_hr,
                           "resting_hr": athlete.resting_hr, "hrv_baseline": athlete.hrv_baseline}
+    # 官方↔本地交叉校验（未连接官方平台时 empty，前端不显示卡片）
+    from ..services.crosscheck import build_crosscheck, snapshots_dicts
+    payload["crosscheck"] = build_crosscheck(
+        snapshots_dicts(db, athlete.id), payload.get("daily") or [])
     return payload
 
 
@@ -43,8 +48,15 @@ def pro_insights(db: Session = Depends(get_db)):
     if not athlete:
         return {"empty": True}
     acts = activities_dicts(db, athlete.id, days=120, include_raw=True)
+    # current_vdot 与官方快照不传的话，阈值卡的 Daniels 交叉分支和 VO2max 互证卡
+    # 永远不可达（参数定义了却没人喂）——这里补上两条数据线
+    pred = build_prediction(db, athlete.id)
+    from ..services.crosscheck import snapshots_dicts
+    snaps = snapshots_dicts(db, athlete.id)
     return build_pro_insights(acts, athlete_dict(athlete),
-                              now=datetime.now())
+                              current_vdot=pred.current_vdot or None,
+                              now=datetime.now(),
+                              fitness_snapshot=snaps[-1] if snaps else None)
 
 
 @router.get("/forecast")

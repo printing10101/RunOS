@@ -45,6 +45,26 @@ def _review_map(db: Session, athlete_id: int) -> dict:
     return race_prediction_review(db, athlete_id)
 
 
+@router.get("/strategy")
+def race_strategy(race_type: str | None = None, db: Session = Depends(get_db)):
+    """赛时计划：目标比赛的分段配速表 / 补给时间表 / 赛前倒计时 / 环境预案。"""
+    from ..services import race_strategy
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "reason": "请先完善个人档案"}
+    return race_strategy.build_race_plan(db, athlete, race_type)
+
+
+@router.get("/taper-check")
+def taper_check(db: Session = Depends(get_db)):
+    """减量对照：赛末 3 周计划负荷 vs 推荐衰减带（占峰值周百分比）。"""
+    from ..services import taper
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "reason": "请先完善个人档案"}
+    return taper.taper_check(db, athlete)
+
+
 @router.get("")
 def list_races(db: Session = Depends(get_db)):
     athlete = get_default_athlete(db)
