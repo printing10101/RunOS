@@ -128,6 +128,48 @@ def test_cap_absent_without_enough_data():
     assert objective_cap(rows, today=TODAY)["cap_level"] is None
 
 
+# ---------------------------------------------------------------- 睡眠分数口径
+
+def _healthy_rows_with_score(score: float | None, score_date: date | None = None) -> list[dict]:
+    """HRV/睡眠时长都健康（不触发既有 cap）的 27 天底座 + 今天的睡眠分数行。"""
+    rows = [{"date": (TODAY - timedelta(days=27 - i)).isoformat(),
+             "hrv_rmssd": 65 + (i % 3), "sleep_hours": 7.5} for i in range(27)]
+    rows.append({"date": TODAY.isoformat(), "hrv_rmssd": 65, "sleep_hours": 7.5,
+                 "sleep_score": score})
+    if score_date is not None:
+        # 用指定日期的旧分数替换今天的分数（测新鲜度守卫）
+        rows[-1]["sleep_score"] = None
+        rows.append({"date": score_date.isoformat(), "hrv_rmssd": 65,
+                     "sleep_hours": 7.5, "sleep_score": score})
+    return rows
+
+
+def test_cap_poor_sleep_score_is_reduce():
+    """时长够但分数差（碎片化睡眠）→ 同样出 reduce cap，理由点名睡眠分数。"""
+    cap = objective_cap(_healthy_rows_with_score(38), today=TODAY)
+    assert cap["cap_level"] == "reduce"
+    assert any("睡眠分数" in r for r in cap["reasons"])
+
+
+def test_cap_good_sleep_score_no_cap():
+    cap = objective_cap(_healthy_rows_with_score(72), today=TODAY)
+    assert cap["cap_level"] is None
+
+
+def test_cap_stale_sleep_score_ignored():
+    """分数停在 5 天前：跟 HRV 一样，停更的数据不给当下判定。"""
+    cap = objective_cap(
+        _healthy_rows_with_score(20, score_date=TODAY - timedelta(days=5)), today=TODAY)
+    assert cap["cap_level"] is None
+
+
+def test_cap_without_sleep_score_unchanged():
+    """没有 sleep_score 字段的旧数据：行为与上线前完全一致。"""
+    rows = [{"date": (TODAY - timedelta(days=27 - i)).isoformat(),
+             "hrv_rmssd": 65 + (i % 3), "sleep_hours": 7.5} for i in range(28)]
+    assert objective_cap(rows, today=TODAY)["cap_level"] is None
+
+
 # ---------------------------------------------------------------- 打卡建议联动
 
 def test_checkin_objective_cap_lowers_normal_but_never_raises():

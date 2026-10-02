@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -63,6 +63,107 @@ def upsert_metric(data: schemas.BodyMetricIn, db: Session = Depends(get_db)):
     for k, v in data.model_dump().items():
         if v is not None:
             setattr(row, k, v)
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/weather")
+def weather_brief(day: date | None = None, days: int = 14, db: Session = Depends(get_db)):
+    """环境简报：某天的天气 + 配速放慢百分比 + 今日质量课的配速放宽提示，
+    以及近 N 天已录入的环境记录（前端补录入口用）。无环境数据返回 empty。"""
+    from ..services import weather
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "brief": None, "recent": []}
+    since = date.today() - timedelta(days=max(1, min(days, 365)))
+    rows = db.scalars(select(models.WeatherLog).where(
+        models.WeatherLog.athlete_id == athlete.id,
+        models.WeatherLog.date >= since).order_by(models.WeatherLog.date.desc())).all()
+    return {
+        "empty": False,
+        "brief": weather.daily_brief(db, athlete, day),
+        "recent": [{"date": r.date.isoformat(), "temp_c": r.temp_c,
+                    "humidity_pct": r.humidity_pct, "wind_kph": r.wind_kph,
+                    "condition": r.condition, "source": r.source} for r in rows],
+    }
+
+
+@router.post("/weather")
+def upsert_weather(data: schemas.WeatherIn, db: Session = Depends(get_db)):
+    """按日期 upsert 当日环境（幂等，重录即覆盖）。缺日期默认今天。"""
+    from ..services import weather
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "ok": False}
+    row = weather.upsert_day_weather(db, athlete, data.day or date.today(),
+                                     temp_c=data.temp_c, humidity_pct=data.humidity_pct,
+                                     wind_kph=data.wind_kph, condition=data.condition)
+    return {"ok": True, "brief": weather.daily_brief(db, athlete, row.date)}
+
+
+# ---------------------------------------------------------------- 伤病追踪
+
+def _injury_or_404(db: Session, athlete: models.Athlete, injury_id: int) -> models.InjuryLog | None:
+    return db.scalar(select(models.InjuryLog).where(
+        models.InjuryLog.athlete_id == athlete.id, models.InjuryLog.id == injury_id))
+
+
+@router.get("/injuries")
+def injury_panel(db: Session = Depends(get_db)):
+    """伤病面板：全部记录 + 恢复中伤病的渐进建议 + 负荷关联分析。"""
+    from ..services import injury
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "items": [], "advice": None, "correlation": None}
+    actives = injury.active_injuries(db, athlete.id)
+    return {
+        "empty": False,
+        "items": injury.injuries_dicts(db, athlete.id),
+        "active_count": len(actives),
+        "advice": injury.return_to_run_advice(actives[0]) if actives else None,
+        "correlation": injury.load_correlation(db, athlete.id),
+    }
+
+
+@router.post("/injuries")
+def create_injury(data: schemas.InjuryIn, db: Session = Depends(get_db)):
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "ok": False}
+    if data.end_date and data.end_date < data.start_date:
+        raise HTTPException(status_code=400, detail="痊愈日期不能早于起始日期")
+    row = models.InjuryLog(athlete_id=athlete.id, **data.model_dump())
+    db.add(row)
+    db.commit()
+    return {"ok": True, "id": row.id}
+
+
+@router.put("/injuries/{injury_id}")
+def update_injury(injury_id: int, data: schemas.InjuryIn, db: Session = Depends(get_db)):
+    """整条修正：前端「标记痊愈」走 end_date=today 的 PUT。"""
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "ok": False}
+    row = _injury_or_404(db, athlete, injury_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="伤病记录不存在")
+    if data.end_date and data.end_date < data.start_date:
+        raise HTTPException(status_code=400, detail="痊愈日期不能早于起始日期")
+    for k, v in data.model_dump().items():
+        setattr(row, k, v)
+    db.commit()
+    return {"ok": True}
+
+
+@router.delete("/injuries/{injury_id}")
+def delete_injury(injury_id: int, db: Session = Depends(get_db)):
+    athlete = get_default_athlete(db)
+    if not athlete:
+        return {"empty": True, "ok": False}
+    row = _injury_or_404(db, athlete, injury_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="伤病记录不存在")
+    db.delete(row)
     db.commit()
     return {"ok": True}
 

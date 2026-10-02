@@ -126,6 +126,130 @@
       <el-empty v-else description="打卡满 2 天后这里会出现趋势曲线" :image-size="60" />
     </el-card>
 
+    <!-- 今日环境：高温天的配速天然偏慢，点评与配速带都会带上这个修正（services/weather.py） -->
+    <el-card shadow="never" style="margin-top:14px">
+      <template #header>
+        <div class="card-head">今日环境
+          <span class="card-sub">手表同步过气温就不用录；高温天的点评与配速建议按此修正，不冤枉人</span>
+        </div>
+      </template>
+      <div v-if="weatherBrief" style="display:flex; flex-wrap:wrap; gap:20px; align-items:center">
+        <div><span class="w-k">气温 </span><b class="w-v">{{ weatherBrief.temp_c ?? '-' }}℃</b></div>
+        <div v-if="weatherBrief.humidity_pct != null"><span class="w-k">湿度 </span><b class="w-v">{{ weatherBrief.humidity_pct }}%</b></div>
+        <div v-if="weatherBrief.wind_kph != null"><span class="w-k">风速 </span><b class="w-v">{{ weatherBrief.wind_kph }} km/h</b></div>
+        <div v-if="weatherBrief.condition"><span class="w-k">天气 </span><b class="w-v">{{ weatherBrief.condition }}</b></div>
+        <el-tag size="small" :type="weatherBrief.slowdown_pct ? 'warning' : 'success'" effect="plain">
+          {{ weatherBrief.note }}
+        </el-tag>
+        <el-tag size="small" effect="plain" type="info">
+          来源：{{ { manual: '手动录入', watch: '手表同步', api: '天气接口' }[weatherBrief.source] || weatherBrief.source }}
+        </el-tag>
+      </div>
+      <div v-else style="font-size:12.5px; color:var(--text-3)">
+        今天还没有环境记录：录一下气温湿度，点评和配速建议就知道高温不等于退步。
+      </div>
+      <el-divider style="margin:12px 0" />
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+        <span style="font-size:12.5px; color:var(--text-3)">快速录入今天：</span>
+        <el-input-number v-model="wxForm.temp_c" :min="-10" :max="50" :precision="1" size="small"
+                         controls-position="right" placeholder="气温" style="width:110px" />
+        <span class="w-k">℃</span>
+        <el-input-number v-model="wxForm.humidity_pct" :min="0" :max="100" size="small"
+                         controls-position="right" placeholder="湿度" style="width:110px" />
+        <span class="w-k">%RH</span>
+        <el-input v-model="wxForm.condition" size="small" placeholder="晴 / 多云 / 雨（可选）" style="width:150px" />
+        <el-button size="small" type="primary" round :loading="wxSaving" @click="saveWeather">记录</el-button>
+      </div>
+    </el-card>
+
+    <!-- 伤病追踪：结构化记录 → 恢复期渐进建议 + 负荷关联（services/injury.py，只出建议不改课表） -->
+    <el-card shadow="never" style="margin-top:14px">
+      <template #header>
+        <div style="display:flex; align-items:center">
+          <span class="card-head" style="margin:0">伤病追踪
+            <span class="card-sub">恢复中的伤病会进教练简报与每日打卡建议</span>
+          </span>
+          <el-button size="small" type="primary" round style="margin-left:auto"
+                     @click="injuryDialogVisible = true">＋ 记录伤病</el-button>
+        </div>
+      </template>
+
+      <template v-if="injuries.active_count">
+        <el-alert v-for="a in [injuries.advice]" :key="a.injury_id" :closable="false" style="margin-bottom:10px"
+                  :title="`恢复中：${a.body_part} · 第 ${a.days_since_start} 天 → 今日建议「${ADVICE_LEVEL_NAMES[a.level] || a.level}」`"
+                  :description="`${a.why}。${a.pain_rule}`" type="warning" show-icon />
+      </template>
+      <div v-if="injuries.correlation && !injuries.correlation.insufficient && injuries.correlation.detail"
+           style="font-size:12.5px; color:var(--text-2); margin-bottom:10px">
+        🔎 {{ injuries.correlation.detail }}
+      </div>
+
+      <el-table v-if="injuries.items?.length" :data="injuries.items" size="small">
+        <el-table-column label="部位" width="130">
+          <template #default="{ row }">{{ row.body_part }}<template v-if="row.side">（{{ { left: '左', right: '右', both: '双侧' }[row.side] || row.side }}）</template></template>
+        </el-table-column>
+        <el-table-column label="等级" width="80">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain" :type="row.severity >= 3 ? 'danger' : row.severity === 2 ? 'warning' : 'info'">
+              {{ row.severity_label }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="start_date" label="起病" width="110" />
+        <el-table-column label="状态" min-width="140">
+          <template #default="{ row }">
+            <template v-if="row.end_date">已痊愈（{{ row.end_date }}）</template>
+            <el-tag v-else size="small" type="warning" effect="dark">恢复中 · 第 {{ row.days_since_start }} 天</el-tag>
+            <span v-if="row.cause" style="margin-left:6px; font-size:12px; color:var(--text-3)">{{ row.cause }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="170" align="right">
+          <template #default="{ row }">
+            <el-button v-if="!row.end_date" size="small" round @click="markHealed(row)">标记痊愈</el-button>
+            <el-button size="small" round text type="danger" @click="deleteInjury(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-else description="暂无伤病记录：有不适就记一笔，系统会把它与负荷曲线对照，教练也会记住它" :image-size="60" />
+    </el-card>
+
+    <!-- 伤病录入弹窗 -->
+    <el-dialog v-model="injuryDialogVisible" title="记录伤病" width="460px">
+      <el-form :model="injForm" label-width="90px">
+        <el-form-item label="部位" required>
+          <el-input v-model="injForm.body_part" placeholder="膝盖 / 小腿 / 足底 / 髋…" maxlength="32" />
+        </el-form-item>
+        <el-form-item label="侧别">
+          <el-radio-group v-model="injForm.side">
+            <el-radio value="">不区分</el-radio>
+            <el-radio value="left">左</el-radio>
+            <el-radio value="right">右</el-radio>
+            <el-radio value="both">双侧</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="等级">
+          <el-radio-group v-model="injForm.severity">
+            <el-radio :value="1">轻微（可带痛训练）</el-radio>
+            <el-radio :value="2">中等（降量避痛）</el-radio>
+            <el-radio :value="3">严重（停跑就医）</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="起病日期" required>
+          <el-date-picker v-model="injForm.start_date" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="诱因">
+          <el-input v-model="injForm.cause" placeholder="跑量激增 / 崴脚 / 山路下坡…" maxlength="128" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="injForm.notes" type="textarea" :rows="2" maxlength="255" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button round @click="injuryDialogVisible = false">取消</el-button>
+        <el-button type="primary" round :loading="injSaving" @click="saveInjury">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 录入弹窗 -->
     <el-dialog v-model="entryVisible" title="录入 / 修正身体数据（按日期覆盖）" width="520px">
       <el-form :model="form" label-width="110px" size="default">
@@ -145,7 +269,7 @@
       </el-form>
       <template #footer>
         <el-button round @click="entryVisible = false">取消</el-button>
-        <el-button type="primary" round @click="save">保存</el-button>
+        <el-button type="primary" round :loading="saving" @click="save">保存</el-button>
       </template>
     </el-dialog>
   </div>
@@ -153,9 +277,9 @@
 </template>
 
 <script setup>
-import { todayStr, localDateStr } from '../utils/common'
+import { ADVICE_LEVEL_NAMES, todayStr, localDateStr } from '../utils/common'
 import { computed, onMounted, onUnmounted, ref, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '../api'
 import { axisStyle, tooltipStyle } from '../utils/echarts-theme'
 import { createChartManager } from '../composables/charts'
@@ -163,6 +287,14 @@ import { createChartManager } from '../composables/charts'
 const d = ref({ empty: true, metrics: [] })
 const overview = ref(null)          // /health/overview 佳明式状态速览（辅助视图，失败置空不拦页面）
 const checkinItems = ref([])        // /checkin/history 近 30 天晨间打卡
+const weatherBrief = ref(null)      // /health/weather 今日环境简报（辅助视图，失败置空不拦页面）
+const wxForm = ref({ temp_c: null, humidity_pct: null, condition: '' })
+const wxSaving = ref(false)
+// 伤病追踪（/health/injuries）：失败置空不拦页面
+const injuries = ref({ empty: true, items: [], active_count: 0, advice: null, correlation: null })
+const injuryDialogVisible = ref(false)
+const injForm = ref({ start_date: todayStr(), body_part: '', side: '', severity: 1, cause: '', notes: '' })
+const injSaving = ref(false)
 const rangeDays = 90
 const entryVisible = ref(false)
 const form = ref({})
@@ -216,7 +348,8 @@ const stressColor = computed(() => {
   return s <= 40 ? '#5fc987' : s <= 60 ? '#d9a24e' : '#e05f5f'
 })
 
-const OV_STATUS_COLOR = { '平衡': '#5fc987', '偏低': '#d9a24e', '不平衡': '#e05f5f' }
+// 与后端 health.py 的 hrv_status 词表对齐：均衡 / 轻度偏低 / 明显偏低（数据不足走 fallback 灰）
+const OV_STATUS_COLOR = { '均衡': '#5fc987', '轻度偏低': '#d9a24e', '明显偏低': '#e05f5f' }
 const ovHrvColor = computed(() => OV_STATUS_COLOR[overview.value?.hrv?.status] || '#dce8e2')
 
 // 连续打卡天数：从今天往回数；今天还没打不算断档（从昨天起算）
@@ -393,6 +526,78 @@ async function loadAll() {
   } catch (e) {
     loadError.value = e.message || '加载失败，请确认后端服务正在运行'
   } finally { loading.value = false }
+  loadWeather()
+  loadInjuries()
+}
+
+async function loadInjuries() {
+  try {
+    injuries.value = await api.get('/health/injuries')
+  } catch { /* 伤病面板拉不到不拦页面 */ }
+}
+
+async function saveInjury() {
+  if (!injForm.value.body_part.trim()) {
+    ElMessage.warning('部位要填一下，比如「膝盖」')
+    return
+  }
+  injSaving.value = true
+  try {
+    await api.post('/health/injuries', { ...injForm.value })
+    injuryDialogVisible.value = false
+    injForm.value = { start_date: todayStr(), body_part: '', side: '', severity: 1, cause: '', notes: '' }
+    ElMessage.success('已记录伤病')
+    loadInjuries()
+  } catch (e) { ElMessage.error(e.message || '记录失败') } finally { injSaving.value = false }
+}
+
+async function markHealed(row) {
+  try {
+    await api.put(`/health/injuries/${row.id}`, {
+      start_date: row.start_date, end_date: todayStr(), body_part: row.body_part,
+      side: row.side, severity: row.severity, cause: row.cause, notes: row.notes,
+    })
+    ElMessage.success('已标记痊愈，恢复期建议随之结束')
+    loadInjuries()
+  } catch (e) { ElMessage.error(e.message || '操作失败') }
+}
+
+async function deleteInjury(row) {
+  const ok = await ElMessageBox.confirm(
+    `确定删除「${row.body_part}」的伤病记录？与之关联的负荷对照会一并消失`,
+    '删除伤病记录', { type: 'warning' }).catch(() => false)
+  if (!ok) return
+  try {
+    await api.del(`/health/injuries/${row.id}`)
+    ElMessage.success('已删除')
+    loadInjuries()
+  } catch (e) { ElMessage.error(e.message || '删除失败') }
+}
+
+async function loadWeather() {
+  try {
+    const data = await api.get('/health/weather', { days: 14 })
+    weatherBrief.value = data.brief
+    if (data.brief) {
+      // 表单预填今天已有记录，重录即覆盖
+      wxForm.value.temp_c = data.brief.temp_c ?? null
+      wxForm.value.humidity_pct = data.brief.humidity_pct ?? null
+      wxForm.value.condition = data.brief.condition || ''
+    }
+  } catch { /* 环境简报拉不到不拦页面 */ }
+}
+
+async function saveWeather() {
+  if (wxForm.value.temp_c == null) {
+    ElMessage.warning('至少填一个气温')
+    return
+  }
+  wxSaving.value = true
+  try {
+    const r = await api.post('/health/weather', { ...wxForm.value })
+    weatherBrief.value = r.brief
+    ElMessage.success('已记录今日环境')
+  } catch (e) { ElMessage.error(e.message || '记录失败') } finally { wxSaving.value = false }
 }
 
 onMounted(loadAll)
@@ -419,4 +624,6 @@ onUnmounted(charts.disposeAll)
 .ov-u { font-size: 11px; color: var(--text-3); margin-left: 2px; font-weight: 400; }
 .ov-s { font-size: 11px; color: var(--text-2); }
 .ov-div { width: 1px; height: 30px; background: var(--border); flex-shrink: 0; }
+.w-k { font-size: 12px; color: var(--text-3); }
+.w-v { font-size: 15px; color: var(--text); }
 </style>

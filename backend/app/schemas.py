@@ -159,6 +159,12 @@ class AiWorkoutCommentIn(BaseModel):
     force: bool = False
 
 
+class AiActivityCommentIn(BaseModel):
+    """活动级 AI 点评：任意活动记录；关联已完成课表课时服务端自动路由到课表点评。"""
+    activity_id: int
+    force: bool = False
+
+
 class AiPlanConfirmIn(BaseModel):
     race_type: RaceType
     target_time_sec: int | None = None
@@ -229,6 +235,27 @@ class BodyMetricIn(BaseModel):
     body_battery: int | None = Field(default=None, ge=0, le=100)
 
 
+class WeatherIn(BaseModel):
+    """每日天气手动录入/修正（按日期 upsert）。字段名用 day 不用 date：
+    带 default 的 `date` 字段会在 annotations 求值时遮蔽 datetime.date（见 AGENTS.md）。"""
+    day: date | None = None
+    temp_c: float | None = Field(default=None, ge=-40, le=55)
+    humidity_pct: int | None = Field(default=None, ge=0, le=100)
+    wind_kph: float | None = Field(default=None, ge=0, le=200)
+    condition: str = Field(default="", max_length=32)
+
+
+class InjuryIn(BaseModel):
+    """伤病记录录入/修正。end_date 传值即「痊愈归档」，缺省 = 仍在恢复中。"""
+    start_date: date
+    end_date: date | None = None
+    body_part: str = Field(min_length=1, max_length=32)
+    side: str = Field(default="", max_length=8)
+    severity: int = Field(default=1, ge=1, le=3)
+    cause: str = Field(default="", max_length=128)
+    notes: str = Field(default="", max_length=255)
+
+
 class PlanWorkoutCompleteIn(BaseModel):
     activity_id: int | None = None
     completed: bool = True  # False = 取消完成，退回 planned
@@ -275,4 +302,28 @@ class CheckinIn(BaseModel):
 class DietEstimateIn(BaseModel):
     """食物描述 → 本地模型营养素估算。"""
     description: str
+
+
+class ExploreFilterIn(BaseModel):
+    """数据探索筛选：col/op 由服务端白名单校验，value 收敛为标量后走绑定参数。"""
+    col: str = Field(min_length=1, max_length=64)
+    op: Literal["eq", "ne", "gt", "ge", "lt", "le", "like"]
+    value: int | float | str
+
+
+class ExploreMetricIn(BaseModel):
+    """数据探索指标：col 为表白名单内的指标列，"*" 仅允许配 count（记录数）。"""
+    col: str = Field(min_length=1, max_length=64)
+    agg: Literal["count", "sum", "avg", "min", "max"]
+
+
+class ExploreQueryIn(BaseModel):
+    """数据探索查询：0-2 个分组维度 + 1-6 个指标 + 最多 6 条筛选。"""
+    table: str = Field(min_length=1, max_length=64)
+    group_by: list[str] = Field(default_factory=list, max_length=2)
+    metrics: list[ExploreMetricIn] = Field(min_length=1, max_length=6)
+    filters: list[ExploreFilterIn] = Field(default_factory=list, max_length=6)
+    date_from: date | None = None
+    date_to: date | None = None
+    limit: int = Field(default=200, ge=1, le=500)
 

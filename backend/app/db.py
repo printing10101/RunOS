@@ -77,6 +77,9 @@ _MIGRATION_DDL = {
     ("plan_workouts", "analysis"): "ALTER TABLE plan_workouts ADD COLUMN analysis JSON",
     # AI 会话滚动摘要（services/ai_coach._compress_and_trim：旧对话裁剪前先压缩成要点）
     ("ai_conversations", "summary"): "ALTER TABLE ai_conversations ADD COLUMN summary TEXT",
+    # 活动级 AI 点评（services/coach_comment.py：未关联课表课的活动也有教练分析）
+    ("activities", "coach_comment"): "ALTER TABLE activities ADD COLUMN coach_comment TEXT",
+    ("activities", "coach_comment_at"): "ALTER TABLE activities ADD COLUMN coach_comment_at DATETIME",
 }
 
 

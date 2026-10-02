@@ -35,6 +35,10 @@ DRIFT_THRESHOLD_PCT = 5.0
 # 档位严重度从低到高（与 checkin_advice._LADDER 同口径，只降不升用）
 CAP_EASY = "easy"
 
+# 睡眠分数（0-100 官方标准化分）用固定阈值而非个人基线：分数本身就是相对
+# 全人群的标准化结果，不像 sleep_hours 需要估个人分布；只在明确差时出 cap。
+SLEEP_SCORE_POOR = 40
+
 
 def _median(vals: list[float]) -> float:
     s = sorted(vals)
@@ -135,6 +139,28 @@ def build_baseline(metrics: list[dict], today: date | None = None) -> dict:
     return {"as_of": today.isoformat(), **out}
 
 
+def _latest_sleep_score(metrics: list[dict], today: date) -> float | None:
+    """窗口内最新的非空睡眠分数；新鲜度要求（≤3 天前）与 _metric_status 一致。
+
+    sleep_score 不进 _METRICS 基线体系——固定阈值口径不需要波动带，
+    但「数据停更就不判定」的诚实缺省纪律要遵守。
+    """
+    best: tuple[float, date] | None = None
+    for m in metrics:
+        v = m.get("sleep_score")
+        if v is None:
+            continue
+        d = m.get("date")
+        d = d if isinstance(d, date) else date.fromisoformat(str(d))
+        if not (today - timedelta(days=WINDOW_DAYS - 1) <= d <= today):
+            continue
+        if best is None or d > best[1]:
+            best = (float(v), d)
+    if best is None or (today - best[1]).days > MIN_LATEST_AGE_DAYS:
+        return None
+    return best[0]
+
+
 def objective_cap(metrics: list[dict], today: date | None = None) -> dict:
     """客观身体信号 → 今日建议档位封顶（fueling cap 同构，只降不升）。
 
@@ -178,5 +204,12 @@ def objective_cap(metrics: list[dict], today: date | None = None) -> dict:
         if cap is None:
             cap = "reduce"
         reasons.append(f"昨夜睡眠仅 {sleep['latest']:.1f}h，急性不足")
+
+    # 睡眠分数是 sleep_hours 之外的独立信号：时长够但碎片化（分数低）同样恢复不足
+    score = _latest_sleep_score(metrics, today)
+    if score is not None and score <= SLEEP_SCORE_POOR:
+        if cap is None:
+            cap = "reduce"
+        reasons.append(f"睡眠分数仅 {score:.0f}/100，质量差")
 
     return {"cap_level": cap, "reasons": reasons}

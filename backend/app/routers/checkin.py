@@ -64,11 +64,13 @@ def _get_or_none(db: Session, athlete_id: int, day: date) -> models.DailyCheckin
 def today_checkin(db: Session = Depends(get_db)):
     athlete = get_default_athlete(db)
     if not athlete:
-        return {"checkin": None, "advice": None, "today_workout": None}
+        return {"checkin": None, "advice": None, "today_workout": None, "weather": None}
     row = _get_or_none(db, athlete.id, date.today())
     advice = _advice(db, athlete, row)
+    from ..services import weather
     return {"checkin": _checkin_dict(row) if row else None, "advice": advice,
-            "today_workout": _today_workout(db, athlete.id)}
+            "today_workout": _today_workout(db, athlete.id),
+            "weather": weather.daily_brief(db, athlete)}
 
 
 @router.post("")

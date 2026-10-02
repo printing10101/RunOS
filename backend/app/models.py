@@ -153,6 +153,10 @@ class Activity(Base):
     gear_id: Mapped[int | None] = mapped_column(ForeignKey("gears.id"), nullable=True)  # 使用的装备（跑鞋等）
     gear: Mapped[Gear | None] = relationship()
     raw: Mapped[dict] = mapped_column(JSON, default=dict)
+    # 活动级 AI 教练点评（与 plan_workouts.coach_comment 同一套引擎；未关联课表课的
+    # 活动落在这里，详情页每条记录都有分析——老库靠 db._MIGRATION_DDL 补列）
+    coach_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    coach_comment_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class Gear(Base):
@@ -232,6 +236,29 @@ class DailyCheckin(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
 
 
+class InjuryLog(Base):
+    """伤病结构化记录：部位/等级/起止日期，伤病×负荷关联分析的数据基础。
+
+    与 coach_notes 的自由文本伤病史互补：自由文本供教练对话当上下文，
+    这张表供引擎做时间线关联（伤病起始与前 7 天负荷水平的重合）与恢复期
+    渐进建议。severity：1 轻微（可带痛训练）/ 2 中等（降量避痛）/ 3 严重（停跑就医）；
+    end_date 为空 = 仍在恢复中。
+    """
+
+    __tablename__ = "injury_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    athlete_id: Mapped[int] = mapped_column(ForeignKey("athletes.id"), index=True)
+    start_date: Mapped[date] = mapped_column(Date, index=True)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    body_part: Mapped[str] = mapped_column(String(32))          # 膝盖/小腿/足底/髋/…
+    side: Mapped[str] = mapped_column(String(8), default="")    # left/right/both/空
+    severity: Mapped[int] = mapped_column(Integer, default=1)   # 1-3
+    cause: Mapped[str] = mapped_column(String(128), default="")  # 诱因（跑量激增/崴脚/…）
+    notes: Mapped[str] = mapped_column(String(255), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
+
+
 class BodyMetric(Base):
     """每日身体状态：体重/静息心率/HRV/睡眠/体脂/血氧/呼吸率/压力/身体电量。"""
 
@@ -255,6 +282,32 @@ class BodyMetric(Base):
     recovery_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     recovery_level: Mapped[str | None] = mapped_column(String(32), nullable=True)
     recovery_hours: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class WeatherLog(Base):
+    """每日天气记录（跑步环境修正的输入）：手动录入为主，手表气温只读回退。
+
+    用途：高温/高湿天的目标配速修正与活动点评的环境注记——「31℃ 跑出 6:10」
+    与「15℃ 跑出 6:10」不是同一个表现，点评与建议需要知道环境才能不冤枉人。
+    (athlete_id, date) 唯一；活动自带 temp_c（手表同步）是只读回退源，不落这张表，
+    手动录入的优先级高于手表值。
+    """
+
+    __tablename__ = "weather_logs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    athlete_id: Mapped[int] = mapped_column(ForeignKey("athletes.id"), index=True)
+    date: Mapped[date] = mapped_column(Date, index=True)
+    temp_c: Mapped[float | None] = mapped_column(Float, nullable=True)
+    humidity_pct: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    wind_kph: Mapped[float | None] = mapped_column(Float, nullable=True)
+    condition: Mapped[str] = mapped_column(String(32), default="")   # 晴/多云/雨/…
+    source: Mapped[str] = mapped_column(String(16), default="manual")  # manual / api
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
+
+    __table_args__ = (
+        UniqueConstraint("athlete_id", "date", name="ux_weather_athlete_date"),
+    )
 
 
 class FitnessSnapshot(Base):
@@ -474,6 +527,28 @@ class AiMessage(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
 
     conversation: Mapped[AiConversation] = relationship(back_populates="messages")
+
+
+class CoachBrief(Base):
+    """教练晨报：每天首次打开总览页时由后台线程生成的当日行动简报（当天幂等一条）。
+
+    与 weekly_recap 的分工：那是执行复盘（看过去），这是当日简报（看今天）。
+    事实数字全部由引擎装配，LLM 只按教练人设组织文案；模型不可用退化为
+    规则版（source=rule），生成失败不阻塞总览页——页面上只表现为「暂无晨报」。
+    """
+
+    __tablename__ = "coach_briefs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    athlete_id: Mapped[int] = mapped_column(ForeignKey("athletes.id"), index=True)
+    date: Mapped[date] = mapped_column(Date, index=True)
+    content: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(String(16), default="rule")  # llm / rule
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow_naive)
+
+    __table_args__ = (
+        UniqueConstraint("athlete_id", "date", name="ux_coach_brief_athlete_date"),
+    )
 
 
 class AppSetting(Base):
