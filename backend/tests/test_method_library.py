@@ -254,14 +254,13 @@ def test_tool_method_detail_returns_lightweight_workouts():
     """回归（2026-09-29）：method_full 返回的 workouts 已是 dict，旧代码对 dict
     再调 workout_dict(w) 访问 .id，导致 get_method_workout_detail 对所有方法都炸。
     修复后必须返回轻量摘要（无 structure），配速解析交给 resolve_method_workout。"""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import sessionmaker
-    from sqlalchemy.pool import StaticPool
-
     from app.db import Base
     from app.models import TrainingMethod, WorkoutTemplate
     from app.services.ai_tools import execute_tool
     from factories import make_athlete
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
 
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False},
                            poolclass=StaticPool)

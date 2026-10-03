@@ -104,9 +104,9 @@ def gather_facts(db: Session, athlete: models.Athlete) -> dict:
             parts.append(f"约 {round(first.duration_min)} 分钟")
         workout_line = "，".join(parts) + (f"（共 {len(wo)} 节）" if len(wo) > 1 else "")
 
-    from .checkin_advice import build_checkin_advice
-    from .baseline import objective_cap
     from ..data import body_metrics_dicts
+    from .baseline import objective_cap
+    from .checkin_advice import build_checkin_advice
     row = db.scalar(select(models.DailyCheckin).where(
         models.DailyCheckin.athlete_id == athlete.id,
         models.DailyCheckin.date == today))

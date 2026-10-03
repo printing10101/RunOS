@@ -14,8 +14,8 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from ..data import get_default_athlete
-from .vocab import session_label
 from .planner import week_start
+from .vocab import session_label
 
 # 疑问/请求信号：出现即不走直通（这些需要 LLM 的推理或工具循环）
 _QUESTION_MARKS = ("如何", "怎么", "为什么", "为何", "吗", "请", "帮我",

@@ -18,9 +18,7 @@ from types import SimpleNamespace
 
 from app.config import settings
 from app.services import ai_coach, ai_tools
-
 from test_ai_tool_loop import FakeClient, _text_chunk, _tool_chunk
-
 
 # ---------------------------------------------------------------- 假模型服务（补 client.post）
 

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from .. import models
 from .load_project import planned_workout_load
-from .planner import week_start   # 全项目统一的「这一周的周一」单源（重导出供测试引用）
+from .planner import week_start  # 全项目统一的「这一周的周一」单源（重导出供测试引用）
 
 # 赛末周 → 推荐衰减带（占峰值周计划负荷的比例）
 TAPER_BANDS = {

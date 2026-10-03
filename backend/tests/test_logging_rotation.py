@@ -6,7 +6,6 @@ append 永不轮转的单文件；文件日志此前也不存在。
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 from app.logging_config import _LOG_FILE, _LOG_FORMAT, _reset_for_tests, rotate_big_log
 

@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 import json
-from datetime import date as _date, timedelta as _td
+from datetime import date as _date
+from datetime import timedelta as _td
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse

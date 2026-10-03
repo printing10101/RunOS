@@ -13,8 +13,8 @@ import pytest
 from app import models
 from app.db import get_db
 from app.main import app
-from fastapi.testclient import TestClient
 from factories import make_athlete
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool

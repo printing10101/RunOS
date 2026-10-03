@@ -58,7 +58,6 @@ def test_pro_insights_endpoint_with_avg_hr_run():
     from app import models
     from app.routers.training_status import pro_insights
     from factories import make_athlete
-
     from sqlalchemy import create_engine
     from sqlalchemy.orm import sessionmaker
     from sqlalchemy.pool import StaticPool
