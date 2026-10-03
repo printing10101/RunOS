@@ -79,6 +79,14 @@ describe('展示格式化', () => {
     expect(fmtPace(299.6)).toBe('5:00/km')
   })
 
+  it('fmtPace/fmtTime：小数进位不得拼出 "m:60"（先取整再拆分）', () => {
+    // 与 299.6→4:60 同族的 bug：分量分别取整会在分钟/小时边界拼出 60
+    expect(fmtPace(59.6)).toBe('1:00/km')
+    expect(fmtPace(359.6)).toBe('6:00/km')
+    expect(fmtTime(59.6)).toBe('1:00')
+    expect(fmtTime(3599.6)).toBe('1:00:00')
+  })
+
   it('fmtDate：只取月/日', () => {
     expect(fmtDate('2026-09-14')).toBe('09/14')
     expect(fmtDate(undefined)).toBe('')

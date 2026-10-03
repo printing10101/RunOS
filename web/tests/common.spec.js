@@ -51,6 +51,8 @@ describe('日期工具（本地时区口径）', () => {
     expect(daysBetween('2025-12-31', '2026-01-01')).toBe(1)
     // 反序应给负数，而不是 0
     expect(daysBetween('2026-09-16', '2026-09-14')).toBe(-2)
+    // 直接传 Date 也成立（调用方两种形态都在用）
+    expect(daysBetween(parseLocalDate('2026-09-14'), parseLocalDate('2026-09-16'))).toBe(2)
   })
 })
 
@@ -75,6 +77,7 @@ describe('展示映射的兜底值', () => {
 
   it('acwrColor 按训练学安全线分区（与后端 review_guard 同源阈值）', () => {
     expect(acwrColor(null)).toBe('#5c6f68') // 无数据走中性灰
+    expect(acwrColor(NaN)).toBe('#5c6f68') // 非法数值同样走兜底，不渲染成奇怪颜色
     expect(acwrColor(1.0)).toBe('#5fc987') // 0.8–1.3 达标
     expect(acwrColor(0.8)).toBe('#5fc987')
     expect(acwrColor(1.3)).toBe('#5fc987')
