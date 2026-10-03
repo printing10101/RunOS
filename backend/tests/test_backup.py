@@ -62,6 +62,33 @@ def test_backup_returns_none_when_db_missing(tmp_path, monkeypatch):
     assert backup.backup_db() is None
 
 
+def test_verify_backup_accepts_valid_and_rejects_corrupt(tmp_path):
+    """可用性校验的两条分支：合法库放行；坏文件（打不开/页结构烂）双双拦下。"""
+    good = tmp_path / "good.db"
+    conn = sqlite3.connect(str(good))
+    conn.execute("CREATE TABLE t (x INTEGER)")
+    conn.close()
+    assert backup.verify_backup(good) == (True, "ok")
+
+    not_a_db = tmp_path / "not_a_db.db"
+    not_a_db.write_bytes(b"this is not a sqlite database at all")
+    ok, detail = backup.verify_backup(not_a_db)
+    assert ok is False and detail
+
+    torn = tmp_path / "torn.db"
+    torn.write_bytes(b"SQLite format 3\x00" + b"\x00" * 4096)  # 头像库、内容全零
+    ok, detail = backup.verify_backup(torn)
+    assert ok is False and detail
+
+
+def test_backup_db_records_last_check(tmp_db):
+    dest = backup.backup_db()
+    assert backup.last_check is not None
+    assert backup.last_check["ok"] is True
+    assert backup.last_check["file"] == dest.name
+    assert "T" in backup.last_check["at"]
+
+
 def test_backup_returns_none_for_non_sqlite_url(monkeypatch):
     # 换了数据库后端时不该尝试备份，也不该抛异常
     monkeypatch.setattr(backup.settings, "database_url", "postgresql://localhost/x")

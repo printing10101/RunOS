@@ -27,6 +27,8 @@ def tmp_db(tmp_path, monkeypatch):
     conn.close()
     monkeypatch.setattr(backup.settings, "database_url", f"sqlite:///{db_file.as_posix()}")
     monkeypatch.setattr(backup.settings, "backup_dir", "")
+    # last_check 是模块级状态，会跨测试残留——归零保证「备份前无校验记录」可断言
+    monkeypatch.setattr(backup, "last_check", None)
     return db_file
 
 
@@ -61,6 +63,18 @@ def test_run_backup_endpoint_creates_snapshot(tmp_db):
     name = resp.json()["name"]
     assert name.startswith(backup.PREFIX)
     assert client.get("/api/system/backups").json()["items"]
+
+
+def test_endpoints_surface_last_check(tmp_db):
+    """备份「存在」之外还要看「可用」：GET 带出最近校验结果，POST 直接回本次校验。"""
+    assert client.get("/api/system/backups").json()["last_check"] is None
+
+    created = client.post("/api/system/backups").json()
+    assert created["integrity"]["ok"] is True
+    assert created["integrity"]["file"] == created["name"]
+
+    body = client.get("/api/system/backups").json()
+    assert body["last_check"]["file"] == created["name"]
 
 
 def test_run_backup_without_db_returns_400(tmp_path, monkeypatch):

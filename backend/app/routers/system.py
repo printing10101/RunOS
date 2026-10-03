@@ -51,6 +51,7 @@ def list_backups():
         "backup_dir": str(root) if root else "",
         "items": [{"name": p.name, "size_mb": round(p.stat().st_size / 1048576, 1),
                    "created_at": _created_at(p)} for p in backup.list_backups()],
+        "last_check": backup.last_check,
     }
 
 
@@ -60,7 +61,7 @@ def run_backup():
     p = backup.backup_db()
     if p is None:
         raise HTTPException(status_code=400, detail="备份失败：未找到 SQLite 数据库文件")
-    return {"ok": True, "name": p.name}
+    return {"ok": True, "name": p.name, "integrity": backup.last_check}
 
 
 @router.get("/backups/{name}/download")
