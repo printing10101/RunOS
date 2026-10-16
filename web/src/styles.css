@@ -35,6 +35,10 @@
     "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-serif: "Noto Serif SC", "Source Han Serif SC", "STZhongsong",
     "KaiTi", "SimSun", serif;
+
+  /* ===== CDS 动效令牌（open-claude-ui 逆向移植 · 青绿暗色适配）===== */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);    /* Claude 主缓动曲线 */
+  --ease-overshoot: cubic-bezier(0.34, 1.3, 0.64, 1); /* 轻过冲（勾选/弹入） */
 }
 
 html, body {
@@ -101,3 +105,57 @@ html.dark {
 .el-popper.is-dark { background: #14251f; border-color: var(--border); }
 .el-card { --el-card-bg-color: var(--bg-card); }
 .el-dialog { background: var(--bg-card-solid); border: 1px solid var(--border); }
+
+/* ==========================================================================
+   CDS 全局手感层（open-claude-ui 移植）：所有视图自动继承，无需各自引入
+   ========================================================================== */
+
+/* 1. 路由入场：6px 上浮 + 淡入，260ms 指数缓出（配合 App.vue 的 keyed wrapper） */
+.route-enter { animation: route-in 0.26s var(--ease-out-expo) both; }
+@keyframes route-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* 2. 按钮统一按压反馈：轻缩 0.97 + expo 缓动过渡（Claude 按钮手感） */
+.el-button {
+  transition: transform 100ms ease, box-shadow 220ms var(--ease-out-expo),
+    background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+.el-button:active:not(.is-disabled) { transform: scale(0.97); }
+
+/* 3. 键盘焦点可见性：青玉色微光环（暗色双环架构的焦点态） */
+.el-button:focus-visible,
+a:focus-visible,
+button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 1.5px var(--jade), 0 0 6px 1px rgba(63, 208, 164, 0.25);
+}
+
+/* 4. 尊重系统"减少动态效果"设置：全部动效降级为直切 */
+@media (prefers-reduced-motion: reduce) {
+  .route-enter { animation: none; }
+  .el-button { transition: none; }
+  .el-button:active:not(.is-disabled) { transform: none; }
+}
+
+/* 5. 卡片悬浮手感（CDS card-interactive 青绿版）：
+   全站经盘点真正成型的卡片容器就这 5 类，集中定义一处生效 */
+.metric, .rc-metric, .pace-tile, .wo-card, .el-card {
+  transition: transform 180ms var(--ease-out-expo),
+    box-shadow 180ms var(--ease-out-expo), border-color 180ms ease;
+}
+.metric:hover, .rc-metric:hover, .pace-tile:hover, .el-card:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.28), 0 10px 24px rgba(0, 0, 0, 0.34);
+  border-color: var(--border-soft);
+}
+.wo-card:hover {  /* 本身可点击，反馈略强一档 */
+  transform: translateY(-1.5px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.28), 0 10px 24px rgba(0, 0, 0, 0.34);
+  border-color: rgba(63, 208, 164, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .metric, .rc-metric, .pace-tile, .wo-card, .el-card { transition: none; }
+  .metric:hover, .rc-metric:hover, .pace-tile:hover, .wo-card:hover, .el-card:hover { transform: none; }
+}

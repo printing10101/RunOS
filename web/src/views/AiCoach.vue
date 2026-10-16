@@ -50,14 +50,14 @@
       </el-popover>
     </div>
 
-    <div class="chat-box" ref="chatBox">
+    <div class="chat-box" ref="chatBox" @scroll="onChatScroll" @wheel.passive="onChatWheel">
       <div v-if="!messages.length" class="empty-hints">
         <div class="hint-title">试试问教练：</div>
         <el-button v-for="q in quickPrompts" :key="q" round plain size="large" class="hint-btn"
                    @click="send(q)">{{ q }}</el-button>
       </div>
 
-      <div v-for="(m, mi) in messages" :key="mi" class="msg-row" :class="m.role">
+      <div v-for="(m, mi) in messages" :key="mi" class="msg-row msg-in" :class="m.role">
         <el-avatar v-if="m.role === 'assistant'" :size="30" class="msg-avatar">AI</el-avatar>
         <div class="msg-body">
           <div v-if="m.tools?.length" class="tool-chips">
@@ -69,8 +69,8 @@
 
           <div v-if="m.role === 'user'" class="bubble user">{{ m.content }}</div>
           <div v-else-if="m.content || m.streaming" class="bubble ai">
-            <span style="white-space:pre-wrap" v-html="renderRich(m.content)"></span>
-            <span v-if="m.streaming && !m.content" class="thinking">正在结合你的数据思考…</span>
+            <span style="white-space:pre-wrap" v-html="m.streaming ? renderStreaming(m) : renderRich(m.content)"></span>
+            <span v-if="m.streaming && !m.content" class="thinking">正在结合你的数据思考<span class="dot"/><span class="dot"/><span class="dot"/></span>
             <span v-else-if="m.streaming" class="cursor">▍</span>
           </div>
           <div v-if="m.error" class="bubble ai error">{{ m.error }}</div>
@@ -90,10 +90,14 @@
       </div>
     </div>
 
+    <transition name="jump-fade">
+      <button v-if="showJumpDown" class="jump-down" aria-label="回到底部" @click="jumpToBottom">↓</button>
+    </transition>
+
     <div class="input-bar">
       <el-input v-model="input" type="textarea" :autosize="{ minRows: 1, maxRows: 5 }"
                 placeholder="问教练：这周练什么 / 状态不好怎么办 / 想换个目标…"
-                :disabled="streaming" @keydown.enter.exact.prevent="send()" />
+                :disabled="streaming" @keydown.enter.exact="onEnterKey" />
       <el-button type="primary" round :loading="streaming" @click="send()">发送</el-button>
     </div>
   </div>
@@ -138,6 +142,15 @@ function renderRich(text) {
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/`([^`]+)`/g, '<code>$1</code>')
+}
+
+// 流式字符晕染（CDS grapheme-reveal）：内容分"已定格"+"最新 delta 块"两段，
+// 只有最新块播模糊→清晰入场，已渲染的字绝不重播动画。
+// 代价：markdown 标记恰好跨 delta 边界时，字面 ** 会闪现一个 delta 周期（几十 ms），可接受
+function renderStreaming(m) {
+  const revealLen = m.reveal ? m.reveal.length : 0
+  const settled = m.content.slice(0, m.content.length - revealLen)
+  return renderRich(settled) + '<span class="stream-reveal">' + renderRich(m.reveal || '') + '</span>'
 }
 
 onMounted(() => { loadStatus(); loadConversations({ autoResume: true }); loadNotes() })
@@ -192,7 +205,8 @@ async function openConversation(cid) {
       role: m.role, content: m.content,
       tools: m.tools || [], proposals: m.proposals || [],
     }))
-    scrollBottom()
+    userPinnedBottom.value = true
+    scrollBottom({ force: true })
   } catch (e) {
     ElMessage.error(e.message || '加载历史对话失败')
   }
@@ -220,7 +234,58 @@ async function deleteChat() {
   }
 }
 
-function scrollBottom() { nextTick(() => { if (chatBox.value) chatBox.value.scrollTop = chatBox.value.scrollHeight }) }
+// ===== 滚动手感（移植自 Claude Design System 逆向实现）=====
+// 智能跟随：流式输出时只在与底"吸底"状态下自动滚动；
+// 用户上滑（滚轮向上）立刻松手绝不拽回，重新滚近底部 48px 内自动吸回。
+const userPinnedBottom = ref(true)
+const showJumpDown = ref(false)
+const PINNED_DISTANCE = 48
+
+// 滚动位置传感器：触顶/触底时对应边缘恢复完全清晰，滚入内容时淡入 28px 羽化
+function updateFade(el) {
+  const atTop = el.scrollTop <= 2
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 2
+  const size = '28px'
+  el.style.setProperty('--cds-fade-top', atTop ? '0px' : size)
+  el.style.setProperty('--cds-fade-bottom', atBottom ? '0px' : size)
+}
+function nearBottom(el) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight < PINNED_DISTANCE
+}
+function onChatScroll() {
+  const el = chatBox.value
+  if (!el) return
+  userPinnedBottom.value = nearBottom(el)
+  showJumpDown.value = !userPinnedBottom.value
+  updateFade(el)
+}
+function onChatWheel(e) {
+  // 向上滚动意图 → 立即解除吸底，流式输出不再拽人
+  if (e.deltaY < 0) userPinnedBottom.value = false
+}
+function jumpToBottom() {
+  const el = chatBox.value
+  if (!el) return
+  userPinnedBottom.value = true
+  el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+}
+function scrollBottom({ force = false } = {}) {
+  nextTick(() => {
+    const el = chatBox.value
+    if (!el) return
+    updateFade(el)
+    if (!force && !userPinnedBottom.value) return
+    el.scrollTop = el.scrollHeight
+    updateFade(el)
+  })
+}
+
+// CJK 输入法守卫（Claude 官方断言）：合成中或 keyCode 229 的回车是选字，绝不发送
+function onEnterKey(e) {
+  if (e.isComposing || e.keyCode === 229) return
+  e.preventDefault()
+  send()
+}
 
 async function send(preset) {
   const text = (preset ?? input.value).trim()
@@ -241,7 +306,8 @@ async function send(preset) {
   const reply = { role: 'assistant', content: '', tools: [], proposals: [], streaming: true }
   messages.value.push(reply)
   streaming.value = true
-  scrollBottom()
+  userPinnedBottom.value = true   // 刚发出的消息必须可见
+  scrollBottom({ force: true })
 
   const ac = new AbortController()
   activeAbort = ac
@@ -268,6 +334,7 @@ async function send(preset) {
         try { evt = JSON.parse(line.slice(5)) } catch { continue }
         if (evt.type === 'delta') {
           reply.content += evt.text
+          reply.reveal = evt.text          // 供流式晕染定位最新一块
         } else if (evt.type === 'tool') {
           reply.tools.push({ label: evt.label || TOOL_FALLBACK_LABEL, ok: evt.ok !== false })
         } else if (evt.type === 'proposals') {
@@ -310,8 +377,54 @@ async function applyProposal(p) {
 </script>
 
 <style scoped>
+/* ===== CDS 动效令牌（青绿暗色适配版，令牌规则同 styles.css：先登记后引用）===== */
+.coach-page {
+  --cds-ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);   /* Claude 主缓动曲线 */
+  --cds-fade-size: 28px;                                /* 滚动渐隐羽化距离（官方常量） */
+  --cds-fade-top: 0px;                                  /* 由滚动传感器动态写入 */
+  --cds-fade-bottom: 0px;
+}
+
 .coach-page { display: flex; flex-direction: column; height: calc(100vh - 44px); }
-.chat-box { flex: 1; overflow-y: auto; padding: 18px 4px; display: flex; flex-direction: column; gap: 16px; }
+
+/* 7 档非线性滚动渐隐（y≈x^1.5 幂律曲线，移植自 ScrollFadeContainer） */
+.chat-box {
+  flex: 1; overflow-y: auto; padding: 18px 4px; display: flex; flex-direction: column; gap: 16px;
+  mask-image: linear-gradient(to bottom,
+    transparent,
+    rgba(0, 0, 0, 0.05) calc(var(--cds-fade-top) * 0.15),
+    rgba(0, 0, 0, 0.15) calc(var(--cds-fade-top) * 0.30),
+    rgba(0, 0, 0, 0.30) calc(var(--cds-fade-top) * 0.45),
+    rgba(0, 0, 0, 0.50) calc(var(--cds-fade-top) * 0.60),
+    rgba(0, 0, 0, 0.70) calc(var(--cds-fade-top) * 0.75),
+    rgba(0, 0, 0, 0.85) calc(var(--cds-fade-top) * 0.87),
+    #000 var(--cds-fade-top),
+    #000 calc(100% - var(--cds-fade-bottom)),
+    rgba(0, 0, 0, 0.85) calc(100% - var(--cds-fade-bottom) * 0.87),
+    rgba(0, 0, 0, 0.70) calc(100% - var(--cds-fade-bottom) * 0.75),
+    rgba(0, 0, 0, 0.50) calc(100% - var(--cds-fade-bottom) * 0.60),
+    rgba(0, 0, 0, 0.30) calc(100% - var(--cds-fade-bottom) * 0.45),
+    rgba(0, 0, 0, 0.15) calc(100% - var(--cds-fade-bottom) * 0.30),
+    rgba(0, 0, 0, 0.05) calc(100% - var(--cds-fade-bottom) * 0.15),
+    transparent);
+  -webkit-mask-image: linear-gradient(to bottom,
+    transparent,
+    rgba(0, 0, 0, 0.05) calc(var(--cds-fade-top) * 0.15),
+    rgba(0, 0, 0, 0.15) calc(var(--cds-fade-top) * 0.30),
+    rgba(0, 0, 0, 0.30) calc(var(--cds-fade-top) * 0.45),
+    rgba(0, 0, 0, 0.50) calc(var(--cds-fade-top) * 0.60),
+    rgba(0, 0, 0, 0.70) calc(var(--cds-fade-top) * 0.75),
+    rgba(0, 0, 0, 0.85) calc(var(--cds-fade-top) * 0.87),
+    #000 var(--cds-fade-top),
+    #000 calc(100% - var(--cds-fade-bottom)),
+    rgba(0, 0, 0, 0.85) calc(100% - var(--cds-fade-bottom) * 0.87),
+    rgba(0, 0, 0, 0.70) calc(100% - var(--cds-fade-bottom) * 0.75),
+    rgba(0, 0, 0, 0.50) calc(100% - var(--cds-fade-bottom) * 0.60),
+    rgba(0, 0, 0, 0.30) calc(100% - var(--cds-fade-bottom) * 0.45),
+    rgba(0, 0, 0, 0.15) calc(100% - var(--cds-fade-bottom) * 0.30),
+    rgba(0, 0, 0, 0.05) calc(100% - var(--cds-fade-bottom) * 0.15),
+    transparent);
+}
 
 .empty-hints { margin: auto; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .hint-title { color: var(--text-3); font-size: 13px; }
@@ -329,18 +442,50 @@ async function applyProposal(p) {
 .note-row { display: flex; align-items: center; gap: 8px; }
 .note-content { flex: 1; font-size: 13px; line-height: 1.5; }
 
+/* 消息入场：12px 上浮 + 指数缓出（Claude message-fade-up 弹簧手感） */
+.msg-in { animation: msg-in 0.35s var(--cds-ease-out-expo) both; }
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .msg-row { display: flex; gap: 10px; }
 .msg-row.user { justify-content: flex-end; }
 .msg-avatar { background: linear-gradient(135deg, var(--jade), #2a9a78); color: #081210; font-weight: 800; font-size: 12px; flex-shrink: 0; }
 .msg-body { max-width: 76%; display: flex; flex-direction: column; gap: 8px; }
 .msg-row.user .msg-body { align-items: flex-end; }
 
+/* 气泡：暗色双环质感——内侧 1px 微高光 + 细边框（CDS 暗色 ring 架构的青绿版） */
 .bubble { border-radius: 14px; padding: 10px 14px; font-size: 14px; line-height: 1.7; }
-.bubble.user { background: linear-gradient(135deg, rgba(63, 208, 164, 0.16), rgba(63, 208, 164, 0.07)); border: 1px solid rgba(63, 208, 164, 0.25); }
-.bubble.ai { background: var(--bg-inset); border: 1px solid var(--border); }
+.bubble.user {
+  background: linear-gradient(135deg, rgba(63, 208, 164, 0.16), rgba(63, 208, 164, 0.07));
+  border: 1px solid rgba(63, 208, 164, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.bubble.ai { background: var(--bg-inset); border: 1px solid var(--border); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03); }
 .bubble.ai code { background: rgba(255, 255, 255, 0.08); border-radius: 4px; padding: 1px 5px; font-size: 13px; }
 .bubble.ai.error { border-color: rgba(224, 95, 95, 0.45); color: #ea8a8a; background: rgba(224, 95, 95, 0.06); }
-.thinking { color: var(--text-3); }
+.thinking { color: var(--text-3); display: inline-flex; align-items: center; gap: 5px; }
+
+/* 流式字符晕染：6px 模糊 + 淡入，0.45s 指数缓出（Claude 吐字质感的核心） */
+.stream-reveal { animation: grapheme-reveal 0.45s var(--cds-ease-out-expo) both; }
+@keyframes grapheme-reveal {
+  from { opacity: 0; filter: blur(6px); }
+  to   { opacity: 1; filter: blur(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stream-reveal { animation: none; }
+}
+/* 思考中三点波浪（timeline-quiet-dot：错相位 1.4s 循环） */
+.thinking .dot { width: 4px; height: 4px; border-radius: 50%; background: var(--text-3); animation: quiet-dot 1.4s ease-in-out infinite; }
+.thinking .dot:nth-child(2) { animation-delay: 0.18s; }
+.thinking .dot:nth-child(3) { animation-delay: 0.36s; }
+@keyframes quiet-dot {
+  0%, 8%   { opacity: 0.2; transform: translateY(2px); }
+  22%      { opacity: 1; transform: translateY(-2.5px); }
+  36%, 70% { opacity: 1; transform: translateY(0); }
+  90%, 100%{ opacity: 0.2; transform: translateY(0); }
+}
 .cursor { animation: blink 1s steps(2) infinite; color: var(--jade); }
 @keyframes blink { 50% { opacity: 0; } }
 
@@ -353,7 +498,32 @@ async function applyProposal(p) {
 .p-warn { font-size: 12px; color: var(--orange); margin: 3px 0; }
 .p-actions { margin-top: 10px; display: flex; align-items: center; gap: 10px; }
 
-.input-bar { display: flex; gap: 10px; align-items: flex-end; padding: 12px 0 4px; border-top: 1px solid var(--border); }
-.input-bar :deep(.el-textarea__inner) { border-radius: 12px; }
+/* 输入终端：Claude composer 三态双环投影（悬停加深 / 聚焦上浮），220ms expo 缓动 */
+.input-bar { position: relative; display: flex; gap: 10px; align-items: flex-end; padding: 12px 0 4px; border-top: 1px solid var(--border); }
+.input-bar :deep(.el-textarea__inner) {
+  border-radius: 16px;
+  transition: box-shadow 220ms var(--cds-ease-out-expo), border-color 220ms ease;
+}
+.input-bar :deep(.el-textarea__inner:hover) {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25), inset 0 0 0 1px rgba(63, 208, 164, 0.35);
+}
+.input-bar :deep(.el-textarea__inner:focus) {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(63, 208, 164, 0.55);
+  border-color: rgba(63, 208, 164, 0.55);
+}
+
+/* 回到底部悬浮钮：不入场不弹跳，淡入即可 */
+.jump-down {
+  position: absolute; right: 26px; bottom: 96px; z-index: 5;
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--bg-card-solid); color: var(--text-2);
+  font-size: 15px; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: transform 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.jump-down:hover { color: var(--jade); border-color: rgba(63, 208, 164, 0.45); transform: translateY(-1px); }
+.jump-down:active { transform: translateY(0) scale(0.96); }
+.jump-fade-enter-active, .jump-fade-leave-active { transition: opacity 150ms ease; }
+.jump-fade-enter-from, .jump-fade-leave-to { opacity: 0; }
+
 code { background: rgba(157, 184, 173, 0.12); padding: 1px 6px; border-radius: 5px; font-size: 12px; }
 </style>

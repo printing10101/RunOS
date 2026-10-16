@@ -65,7 +65,12 @@
     </el-aside>
 
     <el-main class="app-main">
-      <router-view />
+      <!-- keyed wrapper：路由切换时重挂载并播放统一入场动效（见 styles.css .route-enter） -->
+      <router-view v-slot="{ Component }">
+        <div :key="route.path" class="route-enter">
+          <component :is="Component" />
+        </div>
+      </router-view>
     </el-main>
   </el-container>
 
